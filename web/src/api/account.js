@@ -15,6 +15,14 @@ export function createAccount(data) {
   })
 }
 
+export function updateAccount(id, data) {
+  return request({
+    url: `/accounts/${id}`,
+    method: 'put',
+    data
+  })
+}
+
 export function deleteAccount(id) {
   return request({
     url: `/accounts/${id}`,

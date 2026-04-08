@@ -31,10 +31,11 @@
             {{ formatTime(row.last_check) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button-group>
               <el-button link type="primary" :icon="RefreshCcw" @click="handleCheck(row)">校验</el-button>
+              <el-button link type="primary" :icon="Edit" @click="handleEdit(row)">编辑</el-button>
               <el-button link type="danger" :icon="Trash2" @click="handleDelete(row)">删除</el-button>
             </el-button-group>
           </template>
@@ -43,7 +44,7 @@
     </el-card>
 
     <!-- 添加账号对话框 -->
-    <el-dialog v-model="dialogVisible" title="添加新账号" width="500px" destroy-on-close>
+    <el-dialog v-model="dialogVisible" :title="accountForm.id ? '编辑账号' : '添加新账号'" width="500px" destroy-on-close>
       <el-form :model="accountForm" label-position="top" ref="formRef">
         <el-form-item label="网盘平台" required>
           <el-radio-group v-model="accountForm.platform">
@@ -70,7 +71,7 @@
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="submitForm">确认添加</el-button>
+        <el-button type="primary" :loading="submitting" @click="submitForm">{{ accountForm.id ? '确认更新' : '确认添加' }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -78,9 +79,9 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Plus, RefreshCcw, Trash2 } from 'lucide-vue-next'
+import { Plus, RefreshCcw, Trash2, Edit } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getAccounts, createAccount, deleteAccount, checkAccount } from '../api/account'
+import { getAccounts, createAccount, updateAccount, deleteAccount, checkAccount } from '../api/account'
 
 const accountList = ref([])
 const loading = ref(false)
@@ -88,6 +89,7 @@ const dialogVisible = ref(false)
 const submitting = ref(false)
 
 const accountForm = ref({
+  id: null,
   platform: '139',
   account_name: '',
   cookie: '',
@@ -107,7 +109,18 @@ const fetchList = async () => {
 }
 
 const openAddDialog = () => {
-  accountForm.value = { platform: '139', account_name: '', cookie: '', auth_token: '' }
+  accountForm.value = { id: null, platform: '139', account_name: '', cookie: '', auth_token: '' }
+  dialogVisible.value = true
+}
+
+const handleEdit = (row) => {
+  accountForm.value = {
+    id: row.id,
+    platform: row.platform,
+    account_name: row.account_name,
+    cookie: row.cookie,
+    auth_token: row.auth_token
+  }
   dialogVisible.value = true
 }
 
@@ -116,8 +129,13 @@ const submitForm = async () => {
   
   submitting.value = true
   try {
-    await createAccount(accountForm.value)
-    ElMessage.success('账号添加成功')
+    if (accountForm.value.id) {
+      await updateAccount(accountForm.value.id, accountForm.value)
+      ElMessage.success('账号更新成功')
+    } else {
+      await createAccount(accountForm.value)
+      ElMessage.success('账号添加成功')
+    }
     dialogVisible.value = false
     fetchList()
   } catch (err) {

@@ -24,6 +24,7 @@ func InitRouter(wm *worker.Manager) *gin.Engine {
 		// ... 现有 API 路由
 		api.GET("/accounts", listAccounts)
 		api.POST("/accounts", createAccount)
+		api.PUT("/accounts/:id", updateAccount)
 		api.DELETE("/accounts/:id", deleteAccount)
 		api.POST("/accounts/:id/check", checkAccount)
 
@@ -90,6 +91,21 @@ func createAccount(c *gin.Context) {
 		return
 	}
 	db.DB.Create(&account)
+	c.JSON(http.StatusOK, account)
+}
+
+func updateAccount(c *gin.Context) {
+	id := c.Param("id")
+	var account db.Account
+	if err := db.DB.First(&account, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "account not found"})
+		return
+	}
+	if err := c.ShouldBindJSON(&account); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	db.DB.Save(&account)
 	c.JSON(http.StatusOK, account)
 }
 
