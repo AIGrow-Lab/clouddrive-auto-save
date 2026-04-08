@@ -29,6 +29,8 @@ func InitRouter(wm *worker.Manager) *gin.Engine {
 
 		api.GET("/tasks", listTasks)
 		api.POST("/tasks", createTask)
+		api.PUT("/tasks/:id", updateTask)
+		api.DELETE("/tasks/:id", deleteTask)
 		api.POST("/tasks/:id/run", runTask)
 	}
 
@@ -111,6 +113,27 @@ func createTask(c *gin.Context) {
 	}
 	db.DB.Create(&task)
 	c.JSON(http.StatusOK, task)
+}
+
+func updateTask(c *gin.Context) {
+	id := c.Param("id")
+	var task db.Task
+	if err := db.DB.First(&task, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+		return
+	}
+	if err := c.ShouldBindJSON(&task); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	db.DB.Save(&task)
+	c.JSON(http.StatusOK, task)
+}
+
+func deleteTask(c *gin.Context) {
+	id := c.Param("id")
+	db.DB.Delete(&db.Task{}, id)
+	c.JSON(http.StatusOK, gin.H{"message": "task deleted"})
 }
 
 func runTask(c *gin.Context) {

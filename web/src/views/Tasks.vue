@@ -117,7 +117,7 @@
 import { ref, onMounted } from 'vue'
 import { Plus, Play, Edit, Trash2, RefreshCw } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTasks, createTask, deleteTask, runTask } from '../api/task'
+import { getTasks, createTask, updateTask, deleteTask, runTask } from '../api/task'
 import { getAccounts } from '../api/account'
 
 const taskList = ref([])
@@ -155,6 +155,20 @@ const openAddDialog = () => {
   dialogVisible.value = true
 }
 
+const handleEdit = (row) => {
+  form.value = { 
+    id: row.id,
+    name: row.name,
+    account_id: row.account_id,
+    share_url: row.share_url,
+    extract_code: row.extract_code,
+    save_path: row.save_path,
+    pattern: row.pattern,
+    replacement: row.replacement
+  }
+  dialogVisible.value = true
+}
+
 const submitForm = async () => {
   if (!form.value.name || !form.value.account_id || !form.value.share_url) {
     return ElMessage.warning('请填写必要的信息')
@@ -162,8 +176,13 @@ const submitForm = async () => {
   
   submitting.value = true
   try {
-    await createTask(form.value)
-    ElMessage.success('任务保存成功')
+    if (form.value.id) {
+      await updateTask(form.value.id, form.value)
+      ElMessage.success('任务更新成功')
+    } else {
+      await createTask(form.value)
+      ElMessage.success('任务保存成功')
+    }
     dialogVisible.value = false
     fetchList()
   } catch (err) {

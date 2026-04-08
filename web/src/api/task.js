@@ -15,6 +15,14 @@ export function createTask(data) {
   })
 }
 
+export function updateTask(id, data) {
+  return request({
+    url: `/tasks/${id}`,
+    method: 'put',
+    data
+  })
+}
+
 export function deleteTask(id) {
   return request({
     url: `/tasks/${id}`,
