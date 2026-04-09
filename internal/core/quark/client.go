@@ -44,9 +44,9 @@ func NewQuark(account *db.Account) *Quark {
 
 func (q *Quark) parseMparam(cookie string) map[string]string {
 	mparam := make(map[string]string)
-	reKps := regexp.MustCompile(`(?<!\w)kps=([a-zA-Z0-9%+/=]+)[;&]?`)
-	reSign := regexp.MustCompile(`(?<!\w)sign=([a-zA-Z0-9%+/=]+)[;&]?`)
-	reVcode := regexp.MustCompile(`(?<!\w)vcode=([a-zA-Z0-9%+/=]+)[;&]?`)
+	reKps := regexp.MustCompile(`(?:^|;| )kps=([a-zA-Z0-9%+/=]+)`)
+	reSign := regexp.MustCompile(`(?:^|;| )sign=([a-zA-Z0-9%+/=]+)`)
+	reVcode := regexp.MustCompile(`(?:^|;| )vcode=([a-zA-Z0-9%+/=]+)`)
 
 	if match := reKps.FindStringSubmatch(cookie); len(match) > 1 {
 		mparam["kps"] = strings.ReplaceAll(match[1], "%25", "%")
@@ -146,29 +146,31 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 	q.account.LastCheck = time.Now()
 
 	// 2. 获取容量和 VIP 信息
-	queryGrowth := url.Values{}
-	growthResp, err := q.doRequest(ctx, "GET", BaseURLApp+"/1/clouddrive/capacity/growth/info", queryGrowth, nil, true)
-	if err == nil {
-		var growthRes struct {
-			Data struct {
-				MemberType    string `json:"member_type"`
-				TotalCapacity int64  `json:"total_capacity"`
-				UsedCapacity  int64  `json:"used_capacity"`
-			} `json:"data"`
-		}
-		if json.Unmarshal(growthResp, &growthRes) == nil {
-			q.account.CapacityTotal = growthRes.Data.TotalCapacity
-			q.account.CapacityUsed = growthRes.Data.UsedCapacity
-			vipMap := map[string]string{
-				"NORMAL":    "普通用户",
-				"EXP_SVIP":  "88VIP",
-				"SUPER_VIP": "SVIP",
-				"Z_VIP":     "SVIP+",
+	if q.mparam["kps"] != "" {
+		queryGrowth := url.Values{}
+		growthResp, err := q.doRequest(ctx, "GET", BaseURLApp+"/1/clouddrive/capacity/growth/info", queryGrowth, nil, true)
+		if err == nil && len(growthResp) > 0 {
+			var growthRes struct {
+				Data struct {
+					MemberType    string `json:"member_type"`
+					TotalCapacity int64  `json:"total_capacity"`
+					UsedCapacity  int64  `json:"used_capacity"`
+				} `json:"data"`
 			}
-			if name, ok := vipMap[growthRes.Data.MemberType]; ok {
-				q.account.VipName = name
-			} else {
-				q.account.VipName = growthRes.Data.MemberType
+			if json.Unmarshal(growthResp, &growthRes) == nil {
+				q.account.CapacityTotal = growthRes.Data.TotalCapacity
+				q.account.CapacityUsed = growthRes.Data.UsedCapacity
+				vipMap := map[string]string{
+					"NORMAL":    "普通用户",
+					"EXP_SVIP":  "88VIP",
+					"SUPER_VIP": "SVIP",
+					"Z_VIP":     "SVIP+",
+				}
+				if name, ok := vipMap[growthRes.Data.MemberType]; ok {
+					q.account.VipName = name
+				} else if growthRes.Data.MemberType != "" {
+					q.account.VipName = growthRes.Data.MemberType
+				}
 			}
 		}
 	}
