@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -88,6 +89,7 @@ func (q *Quark) doRequest(ctx context.Context, method, apiURL string, query url.
 	req.Header.Set("Cookie", q.account.Cookie)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", UserAgent)
+	req.Header.Set("Referer", "https://pan.quark.cn/")
 
 	resp, err := q.client.Do(req)
 	if err != nil {
@@ -125,8 +127,7 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 	if err := json.Unmarshal(resp, &resRaw); err != nil {
 		return nil, err
 	}
-	
-	// 夸克 API 比较特殊，code 可能是 0, 0.0, "0", "OK" 或 200
+
 	// 只要有 data 节点且不为空，就认为请求成功
 	data, ok := resRaw["data"].(map[string]interface{})
 	if !ok || data == nil {
@@ -135,7 +136,7 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 	}
 
 	nickname, _ := data["nickname"].(string)
-	
+
 	if nickname == "" {
 		nickname = q.account.AccountName
 	}
@@ -151,6 +152,8 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 	}
 
 	// 2. 获取容量和 VIP 信息
+	// 如果有 kps，优先调用 App 接口获取 (能识别 88VIP 等细分等级)
+	vipFetched := false
 	if q.mparam["kps"] != "" {
 		queryGrowth := url.Values{}
 		growthResp, err := q.doRequest(ctx, "GET", BaseURLApp+"/1/clouddrive/capacity/growth/info", queryGrowth, nil, true)
@@ -175,6 +178,118 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 					q.account.VipName = name
 				} else if growthRes.Data.MemberType != "" {
 					q.account.VipName = growthRes.Data.MemberType
+				}
+				vipFetched = true
+			}
+		}
+	}
+
+	// 如果没有 kps 或者上面的 App 接口失败，降级使用 PC 端网页容量接口
+	if !vipFetched {
+		// 定义待探测的候选 URL 列表（优先尝试用户提供的最新 member 接口）
+		apiURLs := []string{
+			"https://pan.quark.cn/1/clouddrive/member?pr=ucpro&fr=pc",
+			"https://drive-pc.quark.cn/1/clouddrive/capacity?pr=ucpro&fr=pc",
+			"https://pan.quark.cn/1/user/info",
+		}
+
+		for _, apiURLWeb := range apiURLs {
+			capResp, err := q.doRequest(ctx, "GET", apiURLWeb, nil, nil, false)
+			if err != nil || len(capResp) == 0 {
+				continue
+			}
+
+			var capRaw map[string]interface{}
+			if err := json.Unmarshal(capResp, &capRaw); err != nil {
+				continue
+			}
+
+			// 解析探测
+			dataNode, _ := capRaw["data"].(map[string]interface{})
+			metadataNode, _ := capRaw["metadata"].(map[string]interface{})
+
+			// 汇总可用的数据节点
+			resNode := dataNode
+			if resNode == nil {
+				resNode = metadataNode
+			}
+			if resNode == nil {
+				resNode = capRaw
+			}
+
+			if resNode != nil {
+				// 1. 提取容量
+				capInfo, _ := resNode["cap_info"].(map[string]interface{})
+				if capInfo == nil {
+					capInfo = resNode
+				}
+
+				total := float64(0)
+				used := float64(0)
+
+				// 兼容多种字段名：total/used (PC) vs cap_total/cap_used (User) vs total_capacity/use_capacity (Member)
+				if v, ok := capInfo["total"].(float64); ok {
+					total = v
+				}
+				if v, ok := capInfo["total_capacity"].(float64); ok {
+					total = v
+				}
+				if v, ok := capInfo["cap_total"].(float64); ok {
+					total = v
+				}
+				if v, ok := capInfo["used"].(float64); ok {
+					used = v
+				}
+				if v, ok := capInfo["use_capacity"].(float64); ok {
+					used = v
+				}
+				if v, ok := capInfo["cap_used"].(float64); ok {
+					used = v
+				}
+
+				if total > 0 {
+					q.account.CapacityTotal = int64(total)
+					q.account.CapacityUsed = int64(used)
+					vipFetched = true
+				}
+
+				// 2. 提取 VIP 等级
+				if mt, ok := resNode["member_type"]; ok {
+					vipMap := map[string]string{
+						"NORMAL":    "普通用户",
+						"EXP_SVIP":  "88VIP",
+						"SUPER_VIP": "SVIP",
+						"Z_VIP":     "SVIP+",
+					}
+
+					switch v := mt.(type) {
+					case string:
+						if name, ok := vipMap[v]; ok {
+							q.account.VipName = name
+						} else {
+							level, _ := strconv.Atoi(v)
+							if level == 0 {
+								q.account.VipName = "普通用户"
+							} else if level == 1 {
+								q.account.VipName = "VIP"
+							} else if level == 2 {
+								q.account.VipName = "SVIP"
+							}
+						}
+					case float64:
+						level := int(v)
+						if level == 0 {
+							q.account.VipName = "普通用户"
+						} else if level == 1 {
+							q.account.VipName = "VIP"
+						} else if level == 2 {
+							q.account.VipName = "SVIP"
+						}
+					}
+				}
+
+				if vipFetched {
+					break // 成功获取，退出探测
 				}
 			}
 		}
@@ -312,7 +427,7 @@ func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath 
 	if err := json.Unmarshal(resp, &tokenRes); err != nil {
 		return err
 	}
-	
+
 	codeStr := fmt.Sprintf("%v", tokenRes.Code)
 	if codeStr != "0" && codeStr != "0.0" {
 		return fmt.Errorf("Quark token error: %v", tokenRes.Code)
@@ -332,7 +447,7 @@ func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath 
 	var detailRes struct {
 		Data struct {
 			List []struct {
-				Fid            string `json:"fid"`
+				Fid           string `json:"fid"`
 				ShareFidToken string `json:"share_fid_token"`
 			} `json:"list"`
 		} `json:"data"`
