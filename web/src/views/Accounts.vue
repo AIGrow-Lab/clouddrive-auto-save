@@ -17,7 +17,29 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="nickname" label="昵称" min-width="150" />
+        <el-table-column prop="nickname" label="昵称" min-width="120" />
+        <el-table-column prop="vip_name" label="会员" width="100">
+          <template #default="{ row }">
+            <el-tag size="small" type="info" v-if="row.vip_name">{{ row.vip_name }}</el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="存储空间" min-width="160">
+          <template #default="{ row }">
+            <div v-if="row.capacity_total > 0" class="capacity-container">
+              <div class="capacity-text">
+                {{ formatBytes(row.capacity_used) }} / {{ formatBytes(row.capacity_total) }}
+              </div>
+              <el-progress 
+                :percentage="calcPercentage(row.capacity_used, row.capacity_total)" 
+                :show-text="false"
+                :stroke-width="4"
+                :status="getCapacityStatus(row.capacity_used, row.capacity_total)"
+              />
+            </div>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="account_name" label="账号/手机号" width="150" />
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
@@ -168,6 +190,27 @@ const handleDelete = (row) => {
 const formatTime = (timeStr) => {
   if (!timeStr || timeStr.startsWith('0001')) return '从未检查'
   return new Date(timeStr).toLocaleString()
+}
+
+const formatBytes = (bytes) => {
+  if (!bytes || bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+const calcPercentage = (used, total) => {
+  if (!total) return 0
+  const p = (used / total) * 100
+  return p > 100 ? 100 : Number(p.toFixed(1))
+}
+
+const getCapacityStatus = (used, total) => {
+  const p = calcPercentage(used, total)
+  if (p >= 90) return 'exception'
+  if (p >= 70) return 'warning'
+  return 'success'
 }
 
 onMounted(() => {

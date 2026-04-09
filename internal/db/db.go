@@ -19,6 +19,9 @@ type Account struct {
 	Cookie      string `gorm:"type:text" json:"cookie"`
 	AuthToken   string `gorm:"type:text" json:"auth_token"` // 主要用于 139 的 Authorization
 	Status      int    `gorm:"default:1" json:"status"`      // 1: 正常, 0: 失效
+	CapacityUsed  int64  `json:"capacity_used"`
+	CapacityTotal int64  `json:"capacity_total"`
+	VipName       string `gorm:"size:50" json:"vip_name"`
 	LastCheck   time.Time `json:"last_check"`
 }
 
