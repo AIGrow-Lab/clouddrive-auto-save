@@ -9,12 +9,12 @@ import (
 )
 
 // MagicVariables 预定义的魔法正则变量
-// 注意：Go 的 regexp 不支持 Lookaround (断言)，需使用 \b
+// 注意：Go 的 regexp 不支持 Lookaround (断言)，需使用 \b 或捕获组
 var MagicVariables = map[string]string{
 	"{YEAR}":    `\b(?:18|19|20)\d{2}\b`,
 	"{DATE}":    `\b(?:18|19|20)?\d{2}[\.\-/年]\d{1,2}[\.\-/月]\d{1,2}\b`,
 	"{CHINESE}": `[\u4e00-\u9fa5]{2,}`,
-	"{EXT}":     `\.\w+$`,
+	"{EXT}":     `\.(\w+)$`, // 使用捕获组提取后缀
 }
 
 // RenameOptions 重命名选项
@@ -47,8 +47,15 @@ func (p *Processor) Process(opts RenameOptions) (string, error) {
 	for varName, regPattern := range MagicVariables {
 		if strings.Contains(result, varName) {
 			re := regexp.MustCompile(regPattern)
-			match := re.FindString(opts.FileName)
-			if match != "" {
+			matches := re.FindStringSubmatch(opts.FileName)
+			if len(matches) > 0 {
+				// 如果正则中有捕获组（如 {EXT}），则取第一个捕获组的内容
+				// 否则取整个匹配到的字符串内容
+				match := matches[0]
+				if len(matches) > 1 {
+					match = matches[1]
+				}
+
 				// 特殊处理日期格式
 				if varName == "{DATE}" {
 					match = p.cleanDate(match)
