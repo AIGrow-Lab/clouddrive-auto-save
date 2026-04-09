@@ -1,0 +1,52 @@
+{
+    "status": 200,
+    "code": 0,
+    "message": "",
+    "timestamp": 1775725477,
+    "data": {
+        "member_type": "NORMAL",
+        "image_backup": 1,
+        "deep_recycle_stat": {
+            "recycle_normal_serve_days": 10,
+            "recycle_svip_serve_days": 30,
+            "recycle_zvip_serve_days": 90,
+            "recycle_vip_serve_days": 10,
+            "recycle_pay_serve_days": 30,
+            "deep_recycle_serve_days": 180
+        },
+        "created_at": 1635780329000,
+        "member_info": {
+            "video_save_to_uses": 17,
+            "video_save_to_remains": 0,
+            "file_save_to_remains": 200,
+            "offline_download_remains": 1,
+            "member_type_map": {
+                "MINI_VIP": {
+                    "video_save_to_total": 10
+                }
+            }
+        },
+        "acc_status": 0,
+        "secret_use_capacity": 37549743,
+        "use_capacity": 37549743,
+        "video_backup": 1,
+        "extend_capacity_composition": {
+            "sign_reward": 20971520
+        },
+        "is_new_user": false,
+        "member_status": {
+            "SUPER_VIP": "UNPAID",
+            "VIP": "UNPAID",
+            "Z_VIP": "UNPAID",
+            "MINI_VIP": "UNPAID"
+        },
+        "secret_total_capacity": 10758389760,
+        "subscribe_pay_channel_map": {},
+        "subscribe_status_map": {},
+        "total_capacity": 10758389760
+    },
+    "metadata": {
+        "range_size": 10485760,
+        "server_cur_time": 1775725477514
+    }
+}
