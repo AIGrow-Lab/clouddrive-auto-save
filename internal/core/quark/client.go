@@ -106,6 +106,11 @@ func (q *Quark) doRequest(ctx context.Context, method, apiURL string, query url.
 // ─── CloudDrive 接口实现 ───────────────────────────────────────────────────────
 
 func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
+	// 预校验 Cookie 格式：PC 网页端接口强制要求包含 __uid
+	if !strings.Contains(q.account.Cookie, "__uid=") {
+		return nil, fmt.Errorf("夸克网盘 Cookie 格式不正确，缺少核心参数 __uid（请确保获取的是全量网页端 Cookie）")
+	}
+
 	apiURL := "https://pan.quark.cn/account/info"
 	query := url.Values{}
 	query.Set("fr", "pc")
@@ -116,24 +121,21 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 		return nil, err
 	}
 
-	var res struct {
-		Code    int    `json:"code"`
-		Message string `json:"message"`
-		Data    *struct {
-			Nickname string `json:"nickname"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(resp, &res); err != nil {
+	var resRaw map[string]interface{}
+	if err := json.Unmarshal(resp, &resRaw); err != nil {
 		return nil, err
 	}
-	if res.Code != 0 {
-		return nil, fmt.Errorf("Quark API error: %d, %s", res.Code, res.Message)
+	
+	// 夸克 API 比较特殊，code 可能是 0, 0.0, "0", "OK" 或 200
+	// 只要有 data 节点且不为空，就认为请求成功
+	data, ok := resRaw["data"].(map[string]interface{})
+	if !ok || data == nil {
+		msg, _ := resRaw["message"].(string)
+		return nil, fmt.Errorf("Quark API error: %v, %s", resRaw["code"], msg)
 	}
 
-	nickname := ""
-	if res.Data != nil {
-		nickname = res.Data.Nickname
-	}
+	nickname, _ := data["nickname"].(string)
+	
 	if nickname == "" {
 		nickname = q.account.AccountName
 	}
@@ -203,7 +205,7 @@ func (q *Quark) ListFiles(ctx context.Context, parentID string) ([]core.FileInfo
 	}
 
 	var res struct {
-		Code int `json:"code"`
+		Code interface{} `json:"code"`
 		Data struct {
 			List []struct {
 				Fid      string `json:"fid"`
@@ -216,6 +218,11 @@ func (q *Quark) ListFiles(ctx context.Context, parentID string) ([]core.FileInfo
 	}
 	if err := json.Unmarshal(resp, &res); err != nil {
 		return nil, err
+	}
+
+	codeStr := fmt.Sprintf("%v", res.Code)
+	if codeStr != "0" && codeStr != "0.0" {
+		return nil, fmt.Errorf("Quark API error: %v", res.Code)
 	}
 
 	var files []core.FileInfo
@@ -248,13 +255,18 @@ func (q *Quark) CreateFolder(ctx context.Context, name, parentID string) (string
 	}
 
 	var res struct {
-		Code int `json:"code"`
+		Code interface{} `json:"code"`
 		Data struct {
 			Fid string `json:"fid"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(resp, &res); err != nil {
 		return "", err
+	}
+
+	codeStr := fmt.Sprintf("%v", res.Code)
+	if codeStr != "0" && codeStr != "0.0" {
+		return "", fmt.Errorf("Quark API error: %v", res.Code)
 	}
 	return res.Data.Fid, nil
 }
@@ -292,12 +304,19 @@ func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath 
 		return err
 	}
 	var tokenRes struct {
-		Code int `json:"code"`
+		Code interface{} `json:"code"`
 		Data struct {
 			Stoken string `json:"stoken"`
 		} `json:"data"`
 	}
-	json.Unmarshal(resp, &tokenRes)
+	if err := json.Unmarshal(resp, &tokenRes); err != nil {
+		return err
+	}
+	
+	codeStr := fmt.Sprintf("%v", tokenRes.Code)
+	if codeStr != "0" && codeStr != "0.0" {
+		return fmt.Errorf("Quark token error: %v", tokenRes.Code)
+	}
 	stoken := tokenRes.Data.Stoken
 
 	// 3. 获取详情
