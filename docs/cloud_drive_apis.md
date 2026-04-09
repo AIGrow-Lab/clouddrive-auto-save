@@ -24,7 +24,11 @@
 ### 1.2 账号与用户接口
 - **获取用户信息 (getUser)**: 
   - `POST /user/getUser` (User Host)
-  - 返回: `userDomainId` (关键标识), `userName`, `auth.memberLevel`。
+  - **重要返回结构**:
+    - `userDomainId`: 用户核心标识（容量查询必填）。
+    - `userProfileInfo.userName`: 最新的昵称字段所在路径。
+    - `auth.memberLevel`: 部分版本在此处返回会员等级。
+    - `loginName / account`: 用户的真实手机号。
 - **获取云盘配额 (getPersonalDiskInfo)**: 
   - `POST /user/disk/getPersonalDiskInfo` (User Host)
   - Body: `{"userDomainId": "xxx"}`
