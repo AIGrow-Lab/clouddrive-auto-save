@@ -173,6 +173,9 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 			LoginName    string `json:"loginName"`
 			Account      string `json:"account"`
 		} `json:"data"`
+		Auth struct {
+			MemberLevel int `json:"memberLevel"`
+		} `json:"auth"`
 	}
 	if err := json.Unmarshal(resp, &res); err != nil {
 		return nil, err
@@ -182,11 +185,13 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 	}
 
 	nickname := res.Data.Nickname
-	if nickname == "" {
-		nickname = res.Data.LoginName
+	phone := res.Data.LoginName
+	if phone == "" {
+		phone = res.Data.Account
 	}
+
 	if nickname == "" {
-		nickname = res.Data.Account
+		nickname = phone
 	}
 	if nickname == "" {
 		nickname = c.account.AccountName
@@ -198,6 +203,12 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 	c.account.Nickname = nickname
 	c.account.Status = 1
 	c.account.LastCheck = time.Now()
+
+	// 尝试从 getUser 返回的 auth 节点直接获取会员等级
+	vipLevels := map[int]string{0: "普通用户", 1: "白银会员", 2: "黄金会员", 3: "钻石会员"}
+	if res.Auth.MemberLevel > 0 {
+		c.account.VipName = vipLevels[res.Auth.MemberLevel]
+	}
 
 	// 2. 获取磁盘容量信息
 	diskReq := map[string]interface{}{"userDomainId": res.Data.UserDomainID}
@@ -217,30 +228,75 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 		}
 	}
 
-	// 3. 获取会员等级
-	benefitReq := map[string]interface{}{
-		"isNeedBenefit": 1,
-		"commonAccountInfo": map[string]interface{}{
-			"account":     c.account.AccountName,
-			"accountType": 1,
-		},
-	}
-	benefitResp, err := c.doRequest(ctx, "POST", BaseURL+"/orchestration/group-rebuild/member/v1.0/queryUserBenefits", benefitReq, headers)
-	if err == nil {
-		var benefitRes struct {
-			Data struct {
-				UserSubMemberList []struct {
-					MemberLevel int `json:"memberLevel"`
-				} `json:"userSubMemberList"`
-			} `json:"data"`
+	// 3. 获取会员等级 (如果第一步没拿到)
+	if c.account.VipName == "" || c.account.VipName == "普通用户" {
+		// 优先尝试从 AuthToken (Basic auth) 中提取手机号
+		if c.account.AuthToken != "" {
+			authVal := strings.TrimSpace(strings.TrimPrefix(c.account.AuthToken, "Basic "))
+			authVal = strings.TrimPrefix(authVal, "basic ")
+			if decoded, err := base64.StdEncoding.DecodeString(authVal); err == nil {
+				parts := strings.Split(string(decoded), ":")
+				if len(parts) >= 2 && len(parts[1]) == 11 && strings.HasPrefix(parts[1], "1") {
+					phone = parts[1]
+				}
+			}
 		}
-		if json.Unmarshal(benefitResp, &benefitRes) == nil && len(benefitRes.Data.UserSubMemberList) > 0 {
-			level := benefitRes.Data.UserSubMemberList[0].MemberLevel
-			levels := map[int]string{0: "普通用户", 1: "白银会员", 2: "黄金会员", 3: "钻石会员"}
-			if name, ok := levels[level]; ok {
-				c.account.VipName = name
-			} else {
-				c.account.VipName = fmt.Sprintf("会员L%d", level)
+
+		if phone == "" {
+			phone = c.account.AccountName
+		}
+		benefitReq := map[string]interface{}{
+			"isNeedBenefit": 1,
+			"commonAccountInfo": map[string]interface{}{
+				"account":     phone,
+				"accountType": 1,
+			},
+		}
+		// 使用精简 Headers (nil 则 doRequest 使用默认基础 Header)，避免被服务器风控或结构偏移
+		benefitResp, err := c.doRequest(ctx, "POST", BaseURL+"/orchestration/group-rebuild/member/v1.0/queryUserBenefits", benefitReq, nil)
+		if err == nil {
+			var benefitRaw map[string]interface{}
+			if json.Unmarshal(benefitResp, &benefitRaw) == nil {
+				// 多路径探测：data.userSubMemberList -> data.userMemberList -> userSubMemberList
+				var memberList []interface{}
+				if data, ok := benefitRaw["data"].(map[string]interface{}); ok {
+					if list, ok := data["userSubMemberList"].([]interface{}); ok {
+						memberList = list
+					} else if list, ok := data["userMemberList"].([]interface{}); ok {
+						memberList = list
+					}
+				} else if list, ok := benefitRaw["userSubMemberList"].([]interface{}); ok {
+					memberList = list
+				} else if list, ok := benefitRaw["userMemberList"].([]interface{}); ok {
+					memberList = list
+				}
+
+				if len(memberList) > 0 {
+					if first, ok := memberList[0].(map[string]interface{}); ok {
+						level := -1
+						// 灵活类型探测
+						v := first["memberLevel"]
+						if v == nil {
+							v = first["level"]
+						}
+						switch val := v.(type) {
+						case float64:
+							level = int(val)
+						case string:
+							level, _ = strconv.Atoi(val)
+						case int:
+							level = val
+						}
+
+						if level != -1 {
+							if name, ok := vipLevels[level]; ok {
+								c.account.VipName = name
+							} else {
+								c.account.VipName = fmt.Sprintf("会员L%d", level)
+							}
+						}
+					}
+				}
 			}
 		}
 	}
