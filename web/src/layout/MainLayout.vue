@@ -3,8 +3,8 @@
     <!-- 侧边栏 -->
     <el-aside width="240px" class="sidebar">
       <div class="logo">
-        <div class="logo-icon">C</div>
-        <span>CloudSaver</span>
+        <div class="logo-icon">U</div>
+        <span>UCAS</span>
       </div>
       
       <el-menu
