@@ -36,3 +36,11 @@ export function runTask(id) {
     method: 'post'
   })
 }
+
+export function previewTask(data) {
+  return request({
+    url: '/tasks/preview',
+    method: 'post',
+    data
+  })
+}

@@ -36,3 +36,19 @@ export function checkAccount(id) {
     method: 'post'
   })
 }
+
+export function getFolders(accountId, parentID = '', parentPath = '/') {
+  return request({
+    url: `/accounts/${accountId}/folders`,
+    method: 'get',
+    params: { parent_id: parentID, parent_path: parentPath }
+  })
+}
+
+export function createFolder(accountId, parentID, parentPath, name) {
+  return request({
+    url: `/accounts/${accountId}/folders`,
+    method: 'post',
+    data: { parent_id: parentID, parent_path: parentPath, name }
+  })
+}
