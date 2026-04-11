@@ -65,7 +65,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="执行账号" required>
-              <el-select v-model="form.account_id" placeholder="选择账号" style="width: 100%">
+              <el-select v-model="form.account_id" placeholder="选择账号" style="width: 100%" @change="handleAccountChange">
                 <el-option
                   v-for="acc in accounts"
                   :key="acc.id"
@@ -102,6 +102,7 @@
         <el-form-item label="保存路径" required>
           <div class="path-input-group">
             <el-tree-select
+              :key="form.account_id"
               v-model="form.save_path"
               lazy
               :load="loadFolders"
@@ -282,6 +283,12 @@ const handlePreview = async () => {
   } finally {
     previewLoading.value = false
   }
+}
+
+// 切换账号处理
+const handleAccountChange = () => {
+  form.value.save_path = '/'
+  pathIdMap.value = { '/': '' }
 }
 
 const openAddDialog = () => {
