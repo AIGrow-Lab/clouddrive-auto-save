@@ -27,12 +27,15 @@ func InitRouter(wm *worker.Manager) *gin.Engine {
 		api.PUT("/accounts/:id", updateAccount)
 		api.DELETE("/accounts/:id", deleteAccount)
 		api.POST("/accounts/:id/check", checkAccount)
+		api.GET("/accounts/:id/folders", getAccountFolders)
+		api.POST("/accounts/:id/folders", createAccountFolder)
 
 		api.GET("/tasks", listTasks)
 		api.POST("/tasks", createTask)
 		api.PUT("/tasks/:id", updateTask)
 		api.DELETE("/tasks/:id", deleteTask)
 		api.POST("/tasks/:id/run", runTask)
+		api.POST("/tasks/preview", previewTask)
 
 		api.GET("/dashboard/stats", getDashboardStats)
 	}
