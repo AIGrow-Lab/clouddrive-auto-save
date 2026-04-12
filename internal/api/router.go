@@ -7,6 +7,7 @@ import (
 	_ "github.com/zcq/clouddrive-auto-save/internal/core/quark"
 	"github.com/zcq/clouddrive-auto-save/internal/core/worker"
 	"github.com/zcq/clouddrive-auto-save/internal/db"
+	"github.com/zcq/clouddrive-auto-save/internal/utils"
 	"io"
 	"net/http"
 	"strconv"
