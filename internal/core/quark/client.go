@@ -482,13 +482,31 @@ func (q *Quark) getStoken(ctx context.Context, pwdID, extractCode string) (strin
 	return tokenRes.Data.Stoken, nil
 }
 
-func (q *Quark) ParseShare(ctx context.Context, shareURL, extractCode string) ([]core.FileInfo, error) {
+func (q *Quark) extractShareParams(shareURL string) (pwdID, pdirFID string) {
+	// 提取 pwdID
 	reID := regexp.MustCompile(`/s/(\w+)`)
-	match := reID.FindStringSubmatch(shareURL)
-	if len(match) < 2 {
-		return nil, fmt.Errorf("invalid quark share url")
+	if match := reID.FindStringSubmatch(shareURL); len(match) >= 2 {
+		pwdID = match[1]
 	}
-	pwdID := match[1]
+
+	// 提取 pdirFID (32位十六进制字符串)
+	// 格式通常为 .../share/FID 或 .../share/FID-名称
+	reFID := regexp.MustCompile(`/share/([a-fA-F0-9]{32})`)
+	if match := reFID.FindStringSubmatch(shareURL); len(match) >= 2 {
+		pdirFID = match[1]
+	}
+
+	if pdirFID == "" {
+		pdirFID = "0"
+	}
+	return
+}
+
+func (q *Quark) ParseShare(ctx context.Context, shareURL, extractCode string) ([]core.FileInfo, error) {
+	pwdID, pdirFID := q.extractShareParams(shareURL)
+	if pwdID == "" {
+		return nil, fmt.Errorf("invalid quark share url: %s", shareURL)
+	}
 
 	stoken, err := q.getStoken(ctx, pwdID, extractCode)
 	if err != nil {
@@ -499,7 +517,7 @@ func (q *Quark) ParseShare(ctx context.Context, shareURL, extractCode string) ([
 	detailQuery := url.Values{}
 	detailQuery.Set("pwd_id", pwdID)
 	detailQuery.Set("stoken", stoken)
-	detailQuery.Set("pdir_fid", "0")
+	detailQuery.Set("pdir_fid", pdirFID)
 	detailQuery.Set("pr", "ucpro")
 	detailQuery.Set("fr", "pc")
 	detailQuery.Set("force", "0")
@@ -552,12 +570,10 @@ func (q *Quark) SaveFileTo(ctx context.Context, fileID, targetPath string) error
 }
 
 func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath string, fileIDs []string) error {
-	reID := regexp.MustCompile(`/s/(\w+)`)
-	match := reID.FindStringSubmatch(shareURL)
-	if len(match) < 2 {
-		return fmt.Errorf("invalid quark share url")
+	pwdID, pdirFID := q.extractShareParams(shareURL)
+	if pwdID == "" {
+		return fmt.Errorf("invalid quark share url: %s", shareURL)
 	}
-	pwdID := match[1]
 
 	stoken, err := q.getStoken(ctx, pwdID, extractCode)
 	if err != nil {
@@ -568,7 +584,7 @@ func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath 
 	detailQuery := url.Values{}
 	detailQuery.Set("pwd_id", pwdID)
 	detailQuery.Set("stoken", stoken)
-	detailQuery.Set("pdir_fid", "0")
+	detailQuery.Set("pdir_fid", pdirFID)
 	detailQuery.Set("pr", "ucpro")
 	detailQuery.Set("fr", "pc")
 	detailQuery.Set("force", "0")
@@ -627,7 +643,7 @@ func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath 
 		"to_pdir_fid":    targetID,
 		"pwd_id":         pwdID,
 		"stoken":         stoken,
-		"pdir_fid":       "0",
+		"pdir_fid":       pdirFID,
 		"scene":          "link",
 	}
 	jsonSave, _ := json.Marshal(saveBody)
