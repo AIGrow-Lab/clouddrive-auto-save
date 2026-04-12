@@ -98,10 +98,15 @@ func (m *Manager) execute(job Job) {
 		return
 	}
 
-	// 3.2 日期过滤
+	// 3.2 日期与 ID 过滤
 	var filteredIDs []string
 	for _, f := range files {
-		// 如果设置了开始日期，且文件时间早于开始日期，则过滤掉
+		// 1. 如果匹配到起始文件 ID，则说明之后的文件都是旧文件，直接停止遍历
+		if task.StartFileID != "" && f.ID == task.StartFileID {
+			break
+		}
+
+		// 2. 兼容原有的日期过滤：如果设置了开始日期，且文件时间早于开始日期，则过滤掉
 		if task.StartDate != nil && !f.UpdateTime.IsZero() && f.UpdateTime.Before(*task.StartDate) {
 			continue
 		}

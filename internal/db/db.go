@@ -46,7 +46,9 @@ type Task struct {
 	
 	Cron        string `gorm:"size:100" json:"cron"`         // 任务独立 Cron (可选)
 	StartDate   *time.Time `json:"start_date"`               // 起始日期过滤 (可选)
-	LastRun     time.Time `json:"last_run"`
+	StartFileID string     `gorm:"size:255" json:"start_file_id"` // 起始文件 ID (可选)
+	LastRun     time.Time  `json:"last_run"`
+
 	NextRun     time.Time `json:"next_run"`
 	Status      string `gorm:"size:20;default:'pending'" json:"status"` // pending, running, success, failed
 	Message     string `gorm:"type:text" json:"message"`     // 最后运行的错误信息或统计
