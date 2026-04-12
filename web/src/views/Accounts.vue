@@ -47,11 +47,11 @@
             <span v-else class="empty-text">未获取容量</span>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="100">
+        <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
-            <el-badge :is-dot="true" :type="row.status === 1 ? 'success' : 'danger'">
+            <el-tag :type="row.status === 1 ? 'success' : 'danger'" effect="light" round class="status-tag">
               {{ row.status === 1 ? '正常' : '失效' }}
-            </el-badge>
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="last_check" label="最后检查" width="180">
@@ -294,6 +294,11 @@ html.dark .title-section h2 {
 
 .capacity-remaining {
   color: #10b981;
+  font-weight: 500;
+}
+
+.status-tag {
+  padding: 0 12px;
   font-weight: 500;
 }
 
