@@ -56,57 +56,115 @@
     </el-row>
 
     <el-row :gutter="24" class="content-row">
-      <el-col :span="16">
-        <el-card class="chart-card">
+      <!-- 左侧：实时日志终端 -->
+      <el-col :xs="24" :lg="16">
+        <el-card class="terminal-card" body-style="padding: 0">
           <template #header>
             <div class="card-header">
-              <span>近期转存趋势</span>
-              <el-button link type="primary">查看详情</el-button>
+              <div class="header-title">
+                <el-icon><Terminal /></el-icon>
+                <span>实时日志流</span>
+              </div>
+              <div class="header-actions">
+                <el-tooltip content="清空日志" placement="top">
+                  <el-button link :icon="Trash2" @click="clearLogs" />
+                </el-tooltip>
+              </div>
             </div>
           </template>
-          <div class="placeholder-chart">
-            <!-- 这里后续可以集成 ECharts -->
-            <div class="chart-bar" style="height: 60%"></div>
-            <div class="chart-bar" style="height: 80%"></div>
-            <div class="chart-bar" style="height: 40%"></div>
-            <div class="chart-bar" style="height: 90%"></div>
-            <div class="chart-bar" style="height: 55%"></div>
+          <div class="terminal-window" ref="terminalRef">
+            <div v-for="(log, index) in logs" :key="index" class="log-line" :class="getLogClass(log)">
+              <span class="log-timestamp">{{ new Date().toLocaleTimeString() }}</span>
+              <span class="log-content">{{ log }}</span>
+            </div>
+            <div v-if="logs.length === 0" class="terminal-empty">
+              等待系统日志推送...
+            </div>
           </div>
         </el-card>
       </el-col>
-      <el-col :span="8">
-        <el-card class="activity-card">
+
+      <!-- 右侧：当前任务监控 -->
+      <el-col :xs="24" :lg="8">
+        <el-card class="monitor-card">
           <template #header>
-            <span>实时动态</span>
+            <div class="card-header">
+              <span>任务微进度</span>
+              <el-tag size="small" type="info">{{ runningTasks.length }} 运行中</el-tag>
+            </div>
           </template>
-          <el-timeline>
+          
+          <div class="running-tasks-list">
+            <div v-for="task in runningTasks" :key="task.id" class="task-progress-card">
+              <div class="task-info">
+                <span class="task-name">{{ task.name }}</span>
+                <el-icon class="is-loading"><Loader2 /></el-icon>
+              </div>
+              <div class="task-stage">
+                <el-tag size="small" effect="dark">{{ task.stage }}</el-tag>
+                <span class="stage-msg">{{ task.message }}</span>
+              </div>
+              <el-progress :percentage="50" :indeterminate="true" :show-text="false" />
+            </div>
+
+            <div v-if="runningTasks.length === 0" class="monitor-empty">
+              <el-empty :image-size="60" description="当前无运行中的任务" />
+            </div>
+          </div>
+
+          <el-divider>近期动态</el-divider>
+          <el-timeline class="compact-timeline">
             <el-timeline-item 
               v-for="activity in stats.recent_activities" 
               :key="activity.id"
               :timestamp="formatRelativeTime(activity.last_run)" 
               :type="getStatusType(activity.status)"
             >
-              {{ activity.name }} {{ getStatusText(activity.status) }}
-            </el-timeline-item>
-            <el-timeline-item v-if="!stats.recent_activities?.length" timestamp="暂无">
-              暂无执行动态
+              <div class="timeline-content">
+                <span>{{ activity.name }}</span>
+                <el-button v-if="activity.status === 'failed'" size="small" link type="primary" @click="handleRetry(activity.id)">重试</el-button>
+              </div>
             </el-timeline-item>
           </el-timeline>
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 浮动快捷操作 -->
+    <div class="fab-container">
+      <el-dropdown trigger="click" placement="top">
+        <el-button type="primary" size="large" circle class="fab-main">
+          <Plus :size="28" />
+        </el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item @click="$router.push('/accounts')">添加账号</el-dropdown-item>
+            <el-dropdown-item @click="$router.push('/tasks')">创建任务</el-dropdown-item>
+            <el-dropdown-item divided @click="clearLogs">清空日志</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive } from 'vue'
+import { onMounted, onUnmounted, reactive, ref, nextTick } from 'vue'
 import { 
   Activity, 
   HardDrive, 
   RefreshCw, 
-  User 
+  User,
+  Terminal,
+  Trash2,
+  Play,
+  CheckCircle2,
+  AlertCircle,
+  Loader2
 } from 'lucide-vue-next'
 import { getStats } from '../api/dashboard'
+import { runTask } from '../api/task'
+import { ElMessage } from 'element-plus'
 
 const stats = reactive({
   running_tasks: 0,
@@ -115,6 +173,12 @@ const stats = reactive({
   active_accounts: 0,
   recent_activities: []
 })
+
+// 日志与任务监控
+const logs = ref([])
+const terminalRef = ref(null)
+const runningTasks = ref([])
+let eventSource = null
 
 const fetchStats = async () => {
   try {
@@ -127,7 +191,95 @@ const fetchStats = async () => {
 
 onMounted(() => {
   fetchStats()
+  initSSE()
+  fetchRecentLogs()
 })
+
+onUnmounted(() => {
+  if (eventSource) eventSource.close()
+})
+
+const fetchRecentLogs = async () => {
+  try {
+    const response = await fetch('/api/dashboard/logs/recent')
+    const data = await response.json()
+    logs.value = data
+    scrollToBottom()
+  } catch (error) {
+    console.error('获取历史日志失败:', error)
+  }
+}
+
+const initSSE = () => {
+  // 注意：在开发环境下可能需要处理代理路径，这里使用相对路径
+  eventSource = new EventSource('/api/dashboard/logs')
+  eventSource.onmessage = (event) => {
+    const msg = event.data
+    if (msg.startsWith('[PROGRESS:')) {
+      handleProgressMessage(msg)
+    } else {
+      logs.value.push(msg)
+      if (logs.value.length > 200) logs.value.shift()
+      scrollToBottom()
+    }
+  }
+  eventSource.onerror = () => {
+    console.error('SSE 连接异常')
+  }
+}
+
+const handleProgressMessage = (msg) => {
+  // 格式: [PROGRESS:TaskID:Stage:Message]
+  const content = msg.substring(10, msg.length - 1)
+  const parts = content.split(':')
+  if (parts.length < 3) return
+  
+  const taskId = parts[0]
+  const stage = parts[1]
+  const info = parts.slice(2).join(':')
+  
+  const taskIdx = runningTasks.value.findIndex(t => t.id === taskId)
+  
+  if (taskIdx > -1) {
+    if (stage === 'Finished') {
+      runningTasks.value.splice(taskIdx, 1)
+      fetchStats()
+    } else {
+      runningTasks.value[taskIdx].stage = stage
+      runningTasks.value[taskIdx].message = info
+    }
+  } else if (stage !== 'Finished') {
+    runningTasks.value.push({ id: taskId, stage, message: info, name: '正在执行的任务' })
+  }
+}
+
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (terminalRef.value) {
+      terminalRef.value.scrollTop = terminalRef.value.scrollHeight
+    }
+  })
+}
+
+const clearLogs = () => {
+  logs.value = []
+}
+
+const handleRetry = async (taskId) => {
+  try {
+    await runTask(taskId)
+    ElMessage.success('已发起重试')
+  } catch (err) {
+    console.error(err)
+  }
+}
+
+const getLogClass = (log) => {
+  if (log.includes('ERROR')) return 'log-error'
+  if (log.includes('WARN')) return 'log-warn'
+  if (log.includes('SUCCESS')) return 'log-success'
+  return ''
+}
 
 const formatSize = (bytes) => {
   if (bytes === 0) return '0 B'
@@ -244,5 +396,128 @@ html.dark .stat-value { color: #f1f5f9; }
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+/* 日志终端样式 */
+.terminal-window {
+  height: 450px;
+  background-color: #0f172a;
+  color: #e2e8f0;
+  padding: 16px;
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-y: auto;
+  border-radius: 0 0 8px 8px;
+}
+
+.log-line {
+  margin-bottom: 4px;
+  display: flex;
+  gap: 12px;
+}
+
+.log-timestamp {
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.log-success { color: #10b981; }
+.log-error { color: #ef4444; }
+.log-warn { color: #f59e0b; }
+
+.terminal-empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #475569;
+  font-style: italic;
+}
+
+/* 任务监控样式 */
+.task-progress-card {
+  background-color: var(--el-fill-color-lighter);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 1px solid var(--el-border-color-lighter);
+}
+
+.task-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.task-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.task-stage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.stage-msg {
+  font-size: 12px;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monitor-empty {
+  padding: 20px 0;
+}
+
+.compact-timeline {
+  margin-top: 16px;
+  padding-left: 4px;
+}
+
+.timeline-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* 悬浮操作栏 */
+.fab-container {
+  position: fixed;
+  right: 40px;
+  bottom: 40px;
+  z-index: 100;
+}
+
+.fab-main {
+  width: 56px;
+  height: 56px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s;
+}
+
+.fab-main:hover {
+  transform: scale(1.1);
+}
+
+.is-loading {
+  animation: rotate 2s linear infinite;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 </style>
