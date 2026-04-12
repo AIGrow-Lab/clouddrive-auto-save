@@ -7,6 +7,7 @@ import (
 	_ "github.com/zcq/clouddrive-auto-save/internal/core/quark"
 	"github.com/zcq/clouddrive-auto-save/internal/core/worker"
 	"github.com/zcq/clouddrive-auto-save/internal/db"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -39,6 +40,8 @@ func InitRouter(wm *worker.Manager) *gin.Engine {
 		api.POST("/tasks/parse_share", parseShareLinkInfo)
 
 		api.GET("/dashboard/stats", getDashboardStats)
+		api.GET("/dashboard/logs", streamLogs)
+		api.GET("/dashboard/logs/recent", getRecentLogs)
 	}
 
 	// 静态资源处理
@@ -201,11 +204,33 @@ func getDashboardStats(c *gin.Context) {
 	db.DB.Order("last_run desc").Limit(5).Find(&recentTasks)
 
 	c.JSON(http.StatusOK, gin.H{
-		"running_tasks":   runningTasks,
-		"capacity_used":   capacityUsed,
-		"today_completed": todayCompleted,
-		"active_accounts": activeAccounts,
+		"running_tasks":     runningTasks,
+		"capacity_used":     capacityUsed,
+		"today_completed":   todayCompleted,
+		"active_accounts":   activeAccounts,
 		"recent_activities": recentTasks,
 	})
 }
 
+func streamLogs(c *gin.Context) {
+	clientChan := utils.GlobalBroadcaster.Subscribe()
+	defer utils.GlobalBroadcaster.Unsubscribe(clientChan)
+
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("Transfer-Encoding", "chunked")
+
+	c.Stream(func(w io.Writer) bool {
+		if msg, ok := <-clientChan; ok {
+			c.SSEvent("message", msg)
+			return true
+		}
+		return false
+	})
+}
+
+func getRecentLogs(c *gin.Context) {
+	logs := utils.GlobalBroadcaster.GetRecent()
+	c.JSON(http.StatusOK, logs)
+}
