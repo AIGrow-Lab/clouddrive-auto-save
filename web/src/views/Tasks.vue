@@ -452,6 +452,9 @@ const openAddDialog = () => {
 }
 
 const handleEdit = (row) => {
+  // 立即清空旧的分享文件列表，防止界面残留
+  shareFiles.value = []
+  
   form.value = { 
     id: row.id,
     name: row.name,
