@@ -36,6 +36,7 @@ func InitRouter(wm *worker.Manager) *gin.Engine {
 		api.DELETE("/tasks/:id", deleteTask)
 		api.POST("/tasks/:id/run", runTask)
 		api.POST("/tasks/preview", previewTask)
+		api.POST("/tasks/parse_share", parseShareLinkInfo)
 
 		api.GET("/dashboard/stats", getDashboardStats)
 	}

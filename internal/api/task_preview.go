@@ -96,3 +96,37 @@ func previewTask(c *gin.Context) {
 
 	c.JSON(http.StatusOK, results)
 }
+
+func parseShareLinkInfo(c *gin.Context) {
+	var req struct {
+		AccountID   uint   `json:"account_id" binding:"required"`
+		ShareURL    string `json:"share_url" binding:"required"`
+		ExtractCode string `json:"extract_code"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var account db.Account
+	if err := db.DB.First(&account, req.AccountID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "account not found"})
+		return
+	}
+
+	driver := core.GetDriver(&account)
+	if driver == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "driver not found"})
+		return
+	}
+
+	ctx := c.Request.Context()
+	files, err := driver.ParseShare(ctx, req.ShareURL, req.ExtractCode)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, files)
+}
