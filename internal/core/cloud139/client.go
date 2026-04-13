@@ -213,6 +213,19 @@ func (c *Cloud139) doRequest(ctx context.Context, method, apiURL string, body in
 
 // ─── CloudDrive 接口实现 ───────────────────────────────────────────────────────
 
+// computeAnySign 根据任意 Body 计算 mcloud-sign
+func (c *Cloud139) computeAnySign(body interface{}) string {
+	now := time.Now().In(time.FixedZone("CST", 8*3600))
+	datetime := now.Format("2006-01-02 15:04:05")
+	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+	randomStr := ""
+	for i := 0; i < 16; i++ {
+		randomStr += string(chars[rand.Intn(len(chars))])
+	}
+	hash := getNewSignHash(body, datetime, randomStr)
+	return fmt.Sprintf("%s,%s,%s", datetime, randomStr, hash)
+}
+
 func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 	log.Printf("[139] 正在获取账号信息...")
 	headers := map[string]string{
@@ -243,6 +256,9 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 	}
 
 	if code != "0000" && code != "0" && code != "" {
+		if code == "05050009" || code == "1010010003" {
+			return nil, fmt.Errorf("登录已失效 (Token Invalid)")
+		}
 		return nil, fmt.Errorf("API error: %s", code)
 	}
 
@@ -271,6 +287,9 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 	if phone == "" {
 		phone, _ = data["msisdn"].(string)
 	}
+	if phone == "" {
+		phone, _ = data["phoneNumber"].(string)
+	}
 	if profile, ok := data["userProfileInfo"].(map[string]interface{}); ok {
 		if phone == "" {
 			phone, _ = profile["msisdn"].(string)
@@ -280,6 +299,9 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 		}
 		if phone == "" {
 			phone, _ = profile["account"].(string)
+		}
+		if phone == "" {
+			phone, _ = profile["phoneNumber"].(string)
 		}
 	}
 
@@ -300,15 +322,121 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 	c.account.LastCheck = time.Now()
 	
 	rePhone := regexp.MustCompile(`1\d{10}`)
+	phoneNum := ""
 	if rePhone.MatchString(phone) {
-		c.account.AccountName = rePhone.FindString(phone)
-	} else if c.account.Cookie != "" && rePhone.MatchString(c.account.Cookie) {
-		c.account.AccountName = rePhone.FindString(c.account.Cookie)
+		phoneNum = rePhone.FindString(phone)
+	} else {
+		phoneNum = c.getPhone()
+	}
+
+	if phoneNum != "" {
+		c.account.AccountName = phoneNum
 	} else if c.account.AccountName == "" {
 		c.account.AccountName = nickname
 	}
 
 	log.Printf("[139] 账号校验成功: %s (%s)", c.account.Nickname, c.account.AccountName)
+
+	// 1. 尝试从基础信息探测会员 (适配最新等级名称)
+	if val, ok := data["userServiceType"].(string); ok && val != "" {
+		switch val {
+		case "1":
+			c.account.VipName = "普通会员"
+		case "2":
+			c.account.VipName = "白银会员"
+		case "3":
+			c.account.VipName = "黄金会员"
+		case "4":
+			c.account.VipName = "钻石会员"
+		case "8":
+			c.account.VipName = "移动云盘会员"
+		default:
+			c.account.VipName = "会员类型:" + val
+		}
+	}
+
+	// 2. 尝试通过权益接口精细化查询 (带签名)
+	if phoneNum != "" {
+		benefitReq := map[string]interface{}{
+			"isNeedBenefit": 1,
+			"commonAccountInfo": map[string]interface{}{
+				"account":     phoneNum,
+				"accountType": 1,
+			},
+		}
+
+		// 必须计算签名
+		benefitSign := c.computeAnySign(benefitReq)
+		benefitHeaders := map[string]string{
+			"mcloud-sign":    benefitSign,
+			"mcloud-channel": "1000101",
+		}
+
+		benefitURLs := []string{
+			BaseURL + "/orchestration/group-rebuild/member/v1.0/queryUserBenefits",
+			BaseURL + "/orchestration/personalCloud/user/v1.0/queryUserBenefits",
+		}
+
+		for _, bUrl := range benefitURLs {
+			bResp, err := c.doRequest(ctx, "POST", bUrl, benefitReq, benefitHeaders)
+			if err != nil {
+				continue
+			}
+
+			var bRes map[string]interface{}
+			if err := json.Unmarshal(bResp, &bRes); err == nil {
+				var foundLevel string
+				var searchNode func(m map[string]interface{})
+				searchNode = func(m map[string]interface{}) {
+					if foundLevel != "" { return }
+					for k, v := range m {
+						lowerK := strings.ToLower(k)
+						if strings.Contains(lowerK, "level") || strings.Contains(lowerK, "vip") || strings.Contains(lowerK, "member") {
+							switch val := v.(type) {
+							case string:
+								if val != "" && val != "0" && val != "普通" && !strings.Contains(val, "http") {
+									foundLevel = val
+									return
+								}
+							case float64:
+								if val > 0 {
+									switch int(val) {
+									case 1:
+										foundLevel = "普通会员"
+									case 2:
+										foundLevel = "白银会员"
+									case 3:
+										foundLevel = "黄金会员"
+									case 4:
+										foundLevel = "钻石会员"
+									default:
+										foundLevel = fmt.Sprintf("会员L%d", int(val))
+									}
+									return
+								}
+							}
+						}
+						if subM, ok := v.(map[string]interface{}); ok {
+							searchNode(subM)
+						} else if subL, ok := v.([]interface{}); ok {
+							for _, item := range subL {
+								if im, ok := item.(map[string]interface{}); ok {
+									searchNode(im)
+								}
+							}
+						}
+					}
+				}
+				searchNode(bRes)
+
+				if foundLevel != "" {
+					c.account.VipName = foundLevel
+					log.Printf("[139] 成功通过权益接口更新会员等级: %s", c.account.VipName)
+					break
+				}
+			}
+		}
+	}
 
 	if userDomainID != "" {
 		diskReq := map[string]interface{}{"userDomainId": userDomainID}
