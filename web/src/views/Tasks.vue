@@ -110,7 +110,24 @@
                 <el-radio v-model="form.start_file_id" :label="row.id">&nbsp;</el-radio>
               </template>
             </el-table-column>
-            <el-table-column prop="name" label="从该文件开始 (含)" show-overflow-tooltip />
+            <el-table-column label="从该文件开始 (含)" show-overflow-tooltip>
+              <template #default="{ row }">
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <el-icon size="18">
+                    <Folder v-if="row.is_folder" color="#eab308" />
+                    <File v-else color="#64748b" />
+                  </el-icon>
+                  <span :style="{ fontWeight: row.is_folder ? '600' : 'normal' }">{{ row.name }}</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="类型" width="80" align="center">
+              <template #default="{ row }">
+                <el-tag size="small" :type="row.is_folder ? 'warning' : 'info'" effect="plain">
+                  {{ row.is_folder ? '文件夹' : '文件' }}
+                </el-tag>
+              </template>
+            </el-table-column>
             <el-table-column prop="updated_at" label="更新时间" width="150" sortable />
           </el-table>
           <div class="share-tips">
@@ -240,7 +257,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
-import { Plus, Play, Edit, Trash2, RefreshCw } from 'lucide-vue-next'
+import { Plus, Play, Edit, Trash2, RefreshCw, Folder, File } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTasks, createTask, updateTask, deleteTask, runTask, previewTask, parseShareLink } from '../api/task'
 import { getAccounts, getFolders, createFolder } from '../api/account'
