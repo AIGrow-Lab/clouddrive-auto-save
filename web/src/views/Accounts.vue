@@ -45,10 +45,15 @@
             <div v-if="row.capacity_total > 0" class="capacity-container">
               <div class="capacity-header">
                 <span class="capacity-used">{{ formatBytes(row.capacity_used) }} / {{ formatBytes(row.capacity_total) }}</span>
-                <span class="capacity-remaining">剩 {{ formatBytes(row.capacity_total - row.capacity_used) }}</span>
+                <span v-if="row.capacity_total >= row.capacity_used" class="capacity-remaining">
+                  剩 {{ formatBytes(row.capacity_total - row.capacity_used) }}
+                </span>
+                <span v-else class="capacity-remaining is-over">
+                  已超额 {{ formatBytes(row.capacity_used - row.capacity_total) }}
+                </span>
               </div>
               <el-progress 
-                :percentage="calcPercentage(row.capacity_used, row.capacity_total)" 
+                :percentage="Math.min(100, calcPercentage(row.capacity_used, row.capacity_total))" 
                 :show-text="false"
                 :stroke-width="6"
                 :status="getCapacityStatus(row.capacity_used, row.capacity_total)"
@@ -106,10 +111,15 @@
               <div v-if="row.capacity_total > 0" class="capacity-section">
                 <div class="capacity-header">
                   <span>{{ formatBytes(row.capacity_used) }} / {{ formatBytes(row.capacity_total) }}</span>
-                  <span class="remaining">剩 {{ formatBytes(row.capacity_total - row.capacity_used) }}</span>
+                  <span v-if="row.capacity_total >= row.capacity_used" class="remaining">
+                    剩 {{ formatBytes(row.capacity_total - row.capacity_used) }}
+                  </span>
+                  <span v-else class="remaining is-over">
+                    已超额 {{ formatBytes(row.capacity_used - row.capacity_total) }}
+                  </span>
                 </div>
                 <el-progress 
-                  :percentage="calcPercentage(row.capacity_used, row.capacity_total)" 
+                  :percentage="Math.min(100, calcPercentage(row.capacity_used, row.capacity_total))" 
                   :show-text="false"
                   :stroke-width="8"
                   :status="getCapacityStatus(row.capacity_used, row.capacity_total)"
@@ -290,11 +300,12 @@ const formatBytes = (bytes) => {
 const calcPercentage = (used, total) => {
   if (!total) return 0
   const p = (used / total) * 100
-  return p > 100 ? 100 : Number(p.toFixed(1))
+  // 返回真实百分比用于逻辑判断，但渲染组件时会限制在 100
+  return Number(p.toFixed(1))
 }
 
 const getCapacityStatus = (used, total) => {
-  const p = calcPercentage(used, total)
+  const p = (used / total) * 100
   if (p >= 90) return 'exception'
   if (p >= 70) return 'warning'
   return 'success'
@@ -503,7 +514,26 @@ html.dark .title-section h2 {
 }
 
 .gradient-progress :deep(.el-progress-bar__inner) {
-  background: linear-gradient(90deg, #6366f1 0%, #a855f7 100%);
+  transition: all 0.3s;
+}
+
+/* 正常状态 (Green) */
+.gradient-progress.is-success :deep(.el-progress-bar__inner) {
+  background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+}
+
+/* 预警状态 (Yellow) */
+.gradient-progress.is-warning :deep(.el-progress-bar__inner) {
+  background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+}
+
+/* 危险/超额状态 (Red) */
+.gradient-progress.is-exception :deep(.el-progress-bar__inner) {
+  background: linear-gradient(90deg, #ef4444 0%, #f87171 100%);
+}
+
+.capacity-remaining.is-over, .remaining.is-over {
+  color: #ef4444 !important;
 }
 
 .empty-text {
