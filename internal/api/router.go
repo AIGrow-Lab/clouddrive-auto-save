@@ -156,6 +156,16 @@ func updateAccount(c *gin.Context) {
 
 func deleteAccount(c *gin.Context) {
 	id := c.Param("id")
+
+	// 检查是否有关联任务
+	var count int64
+	db.DB.Model(&db.Task{}).Where("account_id = ?", id).Count(&count)
+	if count > 0 {
+		log.Printf("[API] 尝试删除账号失败: ID=%s, 存在 %d 个关联任务", id, count)
+		c.PureJSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("该账号有关联的 %d 个任务，请先删除关联任务", count)})
+		return
+	}
+
 	log.Printf("[API] 删除账号: ID=%s", id)
 	db.DB.Delete(&db.Account{}, id)
 	c.PureJSON(http.StatusOK, gin.H{"message": "deleted"})
