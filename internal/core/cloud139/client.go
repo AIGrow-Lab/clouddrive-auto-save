@@ -390,58 +390,24 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 				continue
 			}
 
-			var bRes map[string]interface{}
+			var bRes struct {
+				Data struct {
+					UserSubMemberList []struct {
+						MemberLvName string `json:"memberLvName"`
+					} `json:"userSubMemberList"`
+				} `json:"data"`
+			}
 			if err := json.Unmarshal(bResp, &bRes); err == nil {
-				var foundLevel string
-				var searchNode func(m map[string]interface{})
-				searchNode = func(m map[string]interface{}) {
+				if len(bRes.Data.UserSubMemberList) > 0 {
+					foundLevel := bRes.Data.UserSubMemberList[0].MemberLvName
 					if foundLevel != "" {
-						return
+						c.account.VipName = foundLevel
+						log.Printf("[139] 成功通过权益接口更新会员等级: %s", c.account.VipName)
+						break
 					}
-					for k, v := range m {
-						lowerK := strings.ToLower(k)
-						if strings.Contains(lowerK, "level") || strings.Contains(lowerK, "vip") || strings.Contains(lowerK, "member") {
-							switch val := v.(type) {
-							case string:
-								if val != "" && val != "0" && val != "普通" && !strings.Contains(val, "http") {
-									foundLevel = val
-									return
-								}
-							case float64:
-								if val > 0 {
-									switch int(val) {
-									case 1:
-										foundLevel = "普通会员"
-									case 2:
-										foundLevel = "白银会员"
-									case 3:
-										foundLevel = "黄金会员"
-									case 4:
-										foundLevel = "钻石会员"
-									default:
-										foundLevel = fmt.Sprintf("会员L%d", int(val))
-									}
-									return
-								}
-							}
-						}
-						if subM, ok := v.(map[string]interface{}); ok {
-							searchNode(subM)
-						} else if subL, ok := v.([]interface{}); ok {
-							for _, item := range subL {
-								if im, ok := item.(map[string]interface{}); ok {
-									searchNode(im)
-								}
-							}
-						}
-					}
-				}
-				searchNode(bRes)
-
-				if foundLevel != "" {
-					c.account.VipName = foundLevel
-					log.Printf("[139] 成功通过权益接口更新会员等级: %s", c.account.VipName)
-					break
+				} else {
+					log.Printf("[139] 权益接口未返回会员信息，默认为非会员")
+					c.account.VipName = "普通用户"
 				}
 			}
 		}
