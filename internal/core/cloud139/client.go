@@ -23,11 +23,11 @@ import (
 )
 
 const (
-	BaseURL           = "https://yun.139.com"
-	UserNjsURL        = "https://user-njs.yun.139.com"
-	ShareKdNjsURL     = "https://share-kd-njs.yun.139.com"
-	PersonalKdNjsURL  = "https://personal-kd-njs.yun.139.com"
-	CatalogV1URL      = BaseURL + "/orchestration/personalCloud/catalog/v1.0"
+	BaseURL          = "https://yun.139.com"
+	UserNjsURL       = "https://user-njs.yun.139.com"
+	ShareKdNjsURL    = "https://share-kd-njs.yun.139.com"
+	PersonalKdNjsURL = "https://personal-kd-njs.yun.139.com"
+	CatalogV1URL     = BaseURL + "/orchestration/personalCloud/catalog/v1.0"
 )
 
 type Cloud139 struct {
@@ -208,6 +208,15 @@ func (c *Cloud139) doRequest(ctx context.Context, method, apiURL string, body in
 		return nil, fmt.Errorf("HTTP error: %d, body: %s", resp.StatusCode, string(respBody))
 	}
 
+	// 广播响应到仪表盘
+	u, _ := url.Parse(apiURL)
+	apiPath := apiURL
+	if u != nil {
+		apiPath = u.Path
+	}
+	msg := fmt.Sprintf("[139 Debug] 接口 %s 响应: %s", apiPath, string(respBody))
+	log.Printf(msg)
+
 	return respBody, nil
 }
 
@@ -239,8 +248,6 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 		log.Printf("[139] 获取用户信息请求失败: %v", err)
 		return nil, err
 	}
-
-	log.Printf("[139 Debug] getUser 原始响应: %s", string(resp))
 
 	var resRaw map[string]interface{}
 	if err := json.Unmarshal(resp, &resRaw); err != nil {
@@ -320,7 +327,7 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 	c.account.Nickname = nickname
 	c.account.Status = 1
 	c.account.LastCheck = time.Now()
-	
+
 	rePhone := regexp.MustCompile(`1\d{10}`)
 	phoneNum := ""
 	if rePhone.MatchString(phone) {
@@ -388,7 +395,9 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 				var foundLevel string
 				var searchNode func(m map[string]interface{})
 				searchNode = func(m map[string]interface{}) {
-					if foundLevel != "" { return }
+					if foundLevel != "" {
+						return
+					}
 					for k, v := range m {
 						lowerK := strings.ToLower(k)
 						if strings.Contains(lowerK, "level") || strings.Contains(lowerK, "vip") || strings.Contains(lowerK, "member") {
@@ -484,9 +493,9 @@ func (c *Cloud139) ListFiles(ctx context.Context, parentID string) ([]core.FileI
 			"pageSize":   100,
 			"pageCursor": nil,
 		},
-		"orderBy":         "updated_at",
-		"orderDirection":  "DESC",
-		"parentFileId":    parentID,
+		"orderBy":        "updated_at",
+		"orderDirection": "DESC",
+		"parentFileId":   parentID,
 	}
 
 	resp, err := c.doRequest(ctx, "POST", PersonalKdNjsURL+"/hcy/file/list", body, headers)
@@ -606,7 +615,7 @@ func (c *Cloud139) ParseShare(ctx context.Context, shareURL, extractCode string)
 				name, _ := f["caName"].(string)
 				udTime, _ := f["udTime"].(string)
 				path, _ := f["path"].(string)
-				
+
 				// 时间解析：139 V6 格式通常是 yyyyMMddHHmmss
 				var updateTime time.Time
 				if len(udTime) == 14 {
@@ -859,14 +868,11 @@ func (c *Cloud139) getShareInfo(ctx context.Context, linkID, passwd, pCaID strin
 		return nil, err
 	}
 
-	// 打印原始响应进行调试 (开启详细日志)
-	log.Printf("[139 Debug] 接口原始响应: %s", string(resp))
-
 	var res map[string]interface{}
 	if err := json.Unmarshal(resp, &res); err != nil {
 		return nil, err
 	}
-	
+
 	if code, ok := res["code"]; ok {
 		codeStr := fmt.Sprintf("%v", code)
 		if codeStr != "0" && codeStr != "0000" && codeStr != "" {
@@ -882,7 +888,7 @@ func (c *Cloud139) getShareInfo(ctx context.Context, linkID, passwd, pCaID strin
 	if result, ok := res["result"].(map[string]interface{}); ok {
 		return result, nil
 	}
-	
+
 	return res, nil
 }
 

@@ -141,6 +141,15 @@ func (q *Quark) doRequest(ctx context.Context, method, apiURL string, query url.
 		return nil, fmt.Errorf("Quark API HTTP error: %d, body: %s", resp.StatusCode, string(respBody))
 	}
 
+	// 广播响应到仪表盘
+	u, _ := url.Parse(fullURL)
+	apiPath := fullURL
+	if u != nil {
+		apiPath = u.Path
+	}
+	msg := fmt.Sprintf("[Quark Debug] 接口 %s 响应: %s", apiPath, string(respBody))
+	log.Printf(msg)
+
 	return respBody, nil
 }
 
@@ -263,12 +272,24 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 				}
 
 				total, used := float64(0), float64(0)
-				if v, ok := capInfo["total"].(float64); ok { total = v }
-				if v, ok := capInfo["total_capacity"].(float64); ok { total = v }
-				if v, ok := capInfo["cap_total"].(float64); ok { total = v }
-				if v, ok := capInfo["used"].(float64); ok { used = v }
-				if v, ok := capInfo["use_capacity"].(float64); ok { used = v }
-				if v, ok := capInfo["cap_used"].(float64); ok { used = v }
+				if v, ok := capInfo["total"].(float64); ok {
+					total = v
+				}
+				if v, ok := capInfo["total_capacity"].(float64); ok {
+					total = v
+				}
+				if v, ok := capInfo["cap_total"].(float64); ok {
+					total = v
+				}
+				if v, ok := capInfo["used"].(float64); ok {
+					used = v
+				}
+				if v, ok := capInfo["use_capacity"].(float64); ok {
+					used = v
+				}
+				if v, ok := capInfo["cap_used"].(float64); ok {
+					used = v
+				}
 
 				if total > 0 {
 					q.account.CapacityTotal = int64(total)
@@ -280,9 +301,17 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 					vipMap := map[string]string{"NORMAL": "普通用户", "EXP_SVIP": "88VIP", "SUPER_VIP": "SVIP", "Z_VIP": "SVIP+"}
 					switch v := mt.(type) {
 					case string:
-						if name, ok := vipMap[v]; ok { q.account.VipName = name }
+						if name, ok := vipMap[v]; ok {
+							q.account.VipName = name
+						}
 					case float64:
-						if v == 0 { q.account.VipName = "普通用户" } else if v == 1 { q.account.VipName = "VIP" } else if v == 2 { q.account.VipName = "SVIP" }
+						if v == 0 {
+							q.account.VipName = "普通用户"
+						} else if v == 1 {
+							q.account.VipName = "VIP"
+						} else if v == 2 {
+							q.account.VipName = "SVIP"
+						}
 					}
 				}
 
@@ -347,7 +376,7 @@ func (q *Quark) ListFiles(ctx context.Context, parentID string) ([]core.FileInfo
 		dir, _ := item["dir"].(bool)
 		sizeVal, _ := item["size"].(float64)
 		updateAtVal, _ := item["updated_at"].(float64)
-		
+
 		updateTime := time.Unix(int64(updateAtVal)/1000, 0)
 		files = append(files, core.FileInfo{
 			ID:         fid,
@@ -372,7 +401,7 @@ func (q *Quark) CreateFolder(ctx context.Context, parentID, name string) (*core.
 	query := url.Values{}
 	query.Set("pr", "ucpro")
 	query.Set("fr", "pc")
-	
+
 	body := map[string]interface{}{
 		"pdir_fid":  parentID,
 		"file_name": name,
@@ -387,7 +416,9 @@ func (q *Quark) CreateFolder(ctx context.Context, parentID, name string) (*core.
 
 	var res struct {
 		Code interface{} `json:"code"`
-		Data struct { Fid string `json:"fid"` } `json:"data"`
+		Data struct {
+			Fid string `json:"fid"`
+		} `json:"data"`
 	}
 	if err := json.Unmarshal(resp, &res); err != nil {
 		return nil, err
@@ -433,7 +464,9 @@ func (q *Quark) getStoken(ctx context.Context, pwdID, extractCode string) (strin
 	}
 	var tokenRes struct {
 		Code interface{} `json:"code"`
-		Data struct { Stoken string `json:"stoken"` } `json:"data"`
+		Data struct {
+			Stoken string `json:"stoken"`
+		} `json:"data"`
 	}
 	if err := json.Unmarshal(resp, &tokenRes); err != nil {
 		return "", err
@@ -492,8 +525,6 @@ func (q *Quark) ParseShare(ctx context.Context, shareURL, extractCode string) ([
 		log.Printf("[Quark] 解析分享链接失败 (详情请求失败): %v", err)
 		return nil, err
 	}
-
-	log.Printf("[Quark Debug] ParseShare 详情原始响应: %s", string(resp))
 
 	var detailRes struct {
 		Data struct {
