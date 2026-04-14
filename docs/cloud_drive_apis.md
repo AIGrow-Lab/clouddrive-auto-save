@@ -30,10 +30,11 @@
     - `auth.memberLevel`: 部分版本在此处返回会员等级。
     - `loginName / account / msisdn / phoneNumber`: 用户的真实手机号。
     - `userServiceType`: 用户服务类型标识（如 "8" 代表移动云盘会员）。
-- **获取云盘配额 (getPersonalDiskInfo)**: 
-  - `POST /user/disk/getPersonalDiskInfo` (User Host)
+- **获取云盘配额 (个人与家庭)**: 
+  - `POST /user/disk/getPersonalDiskInfo` (获取个人空间)
+  - `POST /user/disk/getFamilyDiskInfo` (获取家庭空间)
   - Body: `{"userDomainId": "xxx"}`
-  - 返回: `diskSize`, `freeDiskSize` (MB)。
+  - 返回: `diskSize`, `freeDiskSize` (MB)。系统将两者累加得出真实的总可用空间。
 - **获取会员等级 (queryUserBenefits)**: 
   - `POST /orchestration/group-rebuild/member/v1.0/queryUserBenefits` (Base Host)
   - **鉴权要求**: 必须携带 `mcloud-sign` 签名（基于 Body 计算）。

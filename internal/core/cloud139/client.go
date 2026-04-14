@@ -415,7 +415,11 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 
 	if userDomainID != "" {
 		diskReq := map[string]interface{}{"userDomainId": userDomainID}
-		diskResp, err := c.doRequest(ctx, "POST", UserNjsURL+"/user/disk/getPersonalDiskInfo", diskReq, headers)
+		
+		var totalCapacity, usedCapacity int64
+
+		// 1. 获取个人空间
+		personalResp, err := c.doRequest(ctx, "POST", UserNjsURL+"/user/disk/getPersonalDiskInfo", diskReq, headers)
 		if err == nil {
 			var diskRes struct {
 				Data struct {
@@ -423,12 +427,34 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 					FreeDiskSize string `json:"freeDiskSize"`
 				} `json:"data"`
 			}
-			if json.Unmarshal(diskResp, &diskRes) == nil {
+			if json.Unmarshal(personalResp, &diskRes) == nil {
 				total, _ := strconv.ParseInt(diskRes.Data.DiskSize, 10, 64)
 				free, _ := strconv.ParseInt(diskRes.Data.FreeDiskSize, 10, 64)
-				c.account.CapacityTotal = total * 1024 * 1024
-				c.account.CapacityUsed = (total - free) * 1024 * 1024
+				totalCapacity += total * 1024 * 1024
+				usedCapacity += (total - free) * 1024 * 1024
 			}
+		}
+
+		// 2. 获取家庭空间
+		familyResp, err := c.doRequest(ctx, "POST", UserNjsURL+"/user/disk/getFamilyDiskInfo", diskReq, headers)
+		if err == nil {
+			var diskRes struct {
+				Data struct {
+					DiskSize     string `json:"diskSize"`
+					FreeDiskSize string `json:"freeDiskSize"`
+				} `json:"data"`
+			}
+			if json.Unmarshal(familyResp, &diskRes) == nil {
+				total, _ := strconv.ParseInt(diskRes.Data.DiskSize, 10, 64)
+				free, _ := strconv.ParseInt(diskRes.Data.FreeDiskSize, 10, 64)
+				totalCapacity += total * 1024 * 1024
+				usedCapacity += (total - free) * 1024 * 1024
+			}
+		}
+
+		if totalCapacity > 0 {
+			c.account.CapacityTotal = totalCapacity
+			c.account.CapacityUsed = usedCapacity
 		}
 	}
 
