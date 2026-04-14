@@ -440,15 +440,12 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 		if err == nil {
 			var diskRes struct {
 				Data struct {
-					DiskSize     string `json:"diskSize"`
-					FreeDiskSize string `json:"freeDiskSize"`
+					DiskSize string `json:"diskSize"`
 				} `json:"data"`
 			}
 			if json.Unmarshal(familyResp, &diskRes) == nil {
 				total, _ := strconv.ParseInt(diskRes.Data.DiskSize, 10, 64)
-				free, _ := strconv.ParseInt(diskRes.Data.FreeDiskSize, 10, 64)
 				totalCapacity += total * 1024 * 1024
-				usedCapacity += (total - free) * 1024 * 1024
 			}
 		}
 
