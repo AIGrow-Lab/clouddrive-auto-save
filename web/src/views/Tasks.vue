@@ -160,7 +160,7 @@
       append-to-body
       destroy-on-close
     >
-      <div class="folder-tree-container">
+      <div class="folder-tree-container" v-loading="loadingFolders">
         <el-tree
           ref="folderTreeRef"
           lazy
