@@ -38,11 +38,9 @@
   - `POST /orchestration/group-rebuild/member/v1.0/queryUserBenefits` (Base Host)
   - **鉴权要求**: 必须携带 `mcloud-sign` 签名（基于 Body 计算）。
   - Body: `{"isNeedBenefit": 1, "commonAccountInfo": {"account": "手机号", "accountType": 1}}`
-  - 返回会员权益列表：
-    - `1`: 普通会员
-    - `2`: 白银会员
-    - `3`: 黄金会员
-    - `4`: 钻石会员
+  - **返回解析**: 
+    - 会员等级从 `data.userSubMemberList[0].memberLvName` 获取（如："白银会员"）。
+    - **非会员时**: `data.userSubMemberList` 为空数组 `[]`。
 
 ### 1.3 核心鉴权与异常处理
 - **动态签名 (mcloud-sign)**:
