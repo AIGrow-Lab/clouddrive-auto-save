@@ -249,11 +249,19 @@ const submitForm = async () => {
   submitting.value = true
   try {
     if (accountForm.value.id) {
-      await updateAccount(accountForm.value.id, accountForm.value)
-      ElMessage.success('账号更新成功')
+      const res = await updateAccount(accountForm.value.id, accountForm.value)
+      if (res.status === 1) {
+        ElMessage.success('账号更新并校验成功')
+      } else {
+        ElMessage.warning('账号已更新，但连通性校验失败，请检查认证信息')
+      }
     } else {
-      await createAccount(accountForm.value)
-      ElMessage.success('账号添加成功')
+      const res = await createAccount(accountForm.value)
+      if (res.status === 1) {
+        ElMessage.success('账号添加并校验成功')
+      } else {
+        ElMessage.warning('账号已添加，但连通性校验失败，请检查认证信息')
+      }
     }
     dialogVisible.value = false
     fetchList()
