@@ -170,6 +170,7 @@
           highlight-current
           @current-change="handleTreeCurrentChange"
           :expand-on-click-node="false"
+          :empty-text="loadingFolders ? '加载中...' : '暂无目录'"
         >
           <template #default="{ node, data }">
             <span class="custom-tree-node">
@@ -417,6 +418,10 @@ const loadFolders = async (node, resolve) => {
   
   const parentID = node.level === 0 ? '' : node.data.id
   const parentPath = node.level === 0 ? '/' : node.data.path
+  
+  if (node.level === 0) {
+    loadingFolders.value = true
+  }
   try {
     const folders = await getFolders(form.value.account_id, parentID, parentPath)
     folders.forEach(f => {
@@ -426,6 +431,10 @@ const loadFolders = async (node, resolve) => {
   } catch (err) {
     console.error('加载目录失败:', err)
     resolve([])
+  } finally {
+    if (node.level === 0) {
+      loadingFolders.value = false
+    }
   }
 }
 
@@ -496,6 +505,7 @@ const openFolderDialog = () => {
   if (!form.value.account_id) {
     return ElMessage.warning('请先选择执行账号')
   }
+  loadingFolders.value = true
   selectedTreePath.value = form.value.save_path || '/'
   newFolderName.value = ''
   folderDialogVisible.value = true
