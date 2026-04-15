@@ -458,6 +458,19 @@ const handleInlineCreateFolder = async () => {
   // 从选中状态取 ID，若为空则默认取虚拟根节点的空字符串 ''
   const currentID = selectedTreeId.value || '' 
 
+  // 前端事前拦截：检查是否已存在同名文件夹
+  if (folderTreeRef.value) {
+    const currentNode = folderTreeRef.value.getNode(currentPath)
+    if (currentNode && currentNode.childNodes) {
+      const isDuplicate = currentNode.childNodes.some(
+        child => child.data && child.data.label === newFolderName.value.trim()
+      )
+      if (isDuplicate) {
+        return ElMessage.warning('该目录下已存在同名文件夹')
+      }
+    }
+  }
+
   creatingFolder.value = true
   try {
     const res = await createFolder(form.value.account_id, currentID, currentPath, newFolderName.value.trim())
