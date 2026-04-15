@@ -54,3 +54,12 @@
 - **URL**: `/dashboard/logs/recent`
 - **Method**: `GET`
 - **Response**: `Array<string>`
+
+---
+
+## 4. 清空日志历史
+清空后端内存中缓存的所有日志记录。
+
+- **URL**: `/dashboard/logs/recent`
+- **Method**: `DELETE`
+- **Response**: `{"message": "logs cleared"}`

@@ -14,7 +14,7 @@
 | `platform` | string | `139` 或 `quark` |
 | `nickname` | string | 云盘真实昵称 |
 | `vip_name` | string | 会员等级（如：白银会员、SVIP） |
-| `capacity_used`| int64 | 已用容量 (Bytes) <br>*(139 仅计个人空间)* |
+| `capacity_used`| int64 | 已用容量 (Bytes) <br>*(139 含个人+家庭空间)* |
 | `capacity_total`| int64 | 总容量 (Bytes) <br>*(139 含个人+家庭空间)* |
 | `status` | int | 状态 (1:正常, 0:失效) |
 | `last_check` | string | 最后一次校验的时间戳 |
