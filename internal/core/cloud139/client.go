@@ -277,13 +277,30 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 		data = resRaw
 	}
 
+	// 提取 auditNickName (可能在根节点或 userProfileInfo 节点)
 	auditNickName, _ := data["auditNickName"].(string)
+	if profile, ok := data["userProfileInfo"].(map[string]interface{}); ok && auditNickName == "" {
+		if v, ok := profile["auditNickName"].(string); ok {
+			auditNickName = v
+		}
+	}
+
 	userName, _ := data["userName"].(string)
+	if profile, ok := data["userProfileInfo"].(map[string]interface{}); ok && userName == "" {
+		if v, ok := profile["userName"].(string); ok {
+			userName = v
+		}
+	}
 
 	var nickname string
-	if auditNickName == "" && strings.Contains(userName, "*") {
-		// 用户未修改昵称且 userName 被脱敏，直接尝试使用 phoneNumber
+	// 如果用户没改过名 (auditNickName为空) 且当前名字带星号，则认为其为脱敏手机号
+	if (auditNickName == "" || auditNickName == "null") && strings.Contains(userName, "*") {
 		nickname, _ = data["phoneNumber"].(string)
+		if nickname == "" {
+			if profile, ok := data["userProfileInfo"].(map[string]interface{}); ok {
+				nickname, _ = profile["phoneNumber"].(string)
+			}
+		}
 	} else {
 		nickname = userName
 	}
