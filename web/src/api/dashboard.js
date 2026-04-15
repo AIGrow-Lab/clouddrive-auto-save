@@ -6,3 +6,10 @@ export function getStats() {
     method: 'get'
   })
 }
+
+export function clearLogsAPI() {
+  return request({
+    url: '/dashboard/logs/recent',
+    method: 'delete'
+  })
+}

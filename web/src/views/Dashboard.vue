@@ -162,7 +162,7 @@ import {
   AlertCircle,
   Loader2
 } from 'lucide-vue-next'
-import { getStats } from '../api/dashboard'
+import { getStats, clearLogsAPI } from '../api/dashboard'
 import { runTask } from '../api/task'
 import { ElMessage } from 'element-plus'
 
@@ -261,8 +261,15 @@ const scrollToBottom = () => {
   })
 }
 
-const clearLogs = () => {
-  logs.value = []
+const clearLogs = async () => {
+  try {
+    await clearLogsAPI()
+    logs.value = []
+    ElMessage.success('日志已彻底清空')
+  } catch (err) {
+    console.error('清空日志失败:', err)
+    ElMessage.error('清空日志失败')
+  }
 }
 
 const handleRetry = async (taskId) => {

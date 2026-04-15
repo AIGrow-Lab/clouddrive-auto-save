@@ -45,6 +45,7 @@ func InitRouter(wm *worker.Manager) *gin.Engine {
 		api.GET("/dashboard/stats", getDashboardStats)
 		api.GET("/dashboard/logs", streamLogs)
 		api.GET("/dashboard/logs/recent", getRecentLogs)
+		api.DELETE("/dashboard/logs/recent", clearRecentLogs)
 	}
 
 	// 静态资源处理
@@ -53,6 +54,11 @@ func InitRouter(wm *worker.Manager) *gin.Engine {
 	})
 
 	return r
+}
+
+func clearRecentLogs(c *gin.Context) {
+	utils.GlobalBroadcaster.ClearRecent()
+	c.PureJSON(http.StatusOK, gin.H{"message": "logs cleared"})
 }
 
 func performAccountCheck(account *db.Account, ctx context.Context) error {

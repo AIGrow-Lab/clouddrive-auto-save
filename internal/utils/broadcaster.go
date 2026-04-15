@@ -86,6 +86,13 @@ func (b *Broadcaster) GetRecent() []string {
 	return res
 }
 
+// ClearRecent 清空最近的历史日志
+func (b *Broadcaster) ClearRecent() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.history = make([]string, 0, 50)
+}
+
 // Broadcast 发送广播消息（所有模块通过此方法输出实时日志）
 func (b *Broadcaster) Broadcast(message string) {
 	select {
