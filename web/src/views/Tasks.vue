@@ -488,7 +488,7 @@ const openStartFileDialog = async () => {
     }
   } catch (err) {
     console.error('解析链接失败:', err)
-    ElMessage.error('解析分享链接失败，请检查链接或账号状态')
+    // 移除冗余的提示，交给全局 API 拦截器展示后端清洗后的友好报错
     startFileDialogVisible.value = false
   } finally {
     parsingShare.value = false
