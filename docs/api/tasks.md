@@ -20,6 +20,7 @@
 | `extract_code`| string | 否 | 分享提取码 |
 | `save_path` | string | 是 | 云盘内保存路径 (如 `/Movies`) |
 | `start_file_id`| string | 否 | 起始文件 ID，系统将从此文件开始(含)向前转存 |
+| `start_file_name`| string | 否 | 起始文件名称，用于前端 UI 快速回显，减少接口解析等待 |
 | `pattern` | string | 否 | 正则匹配表达式 |
 | `replacement` | string | 否 | 替换模板及魔法变量 |
 
