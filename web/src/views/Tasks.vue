@@ -78,7 +78,7 @@
         </el-row>
 
         <el-form-item label="分享链接" required>
-          <el-input v-model="form.share_url" placeholder="请输入 139 或 Quark 分享链接" />
+          <el-input v-model="form.share_url" placeholder="请输入 139 或 Quark 分享链接" @change="handleUrlChange" />
         </el-form-item>
 
         <el-row :gutter="20">
@@ -336,8 +336,16 @@ const form = ref({
   save_path: '/',
   pattern: '',
   replacement: '',
-  start_file_id: ''
+  start_file_id: '',
+  start_file_name: ''
 })
+
+// 链接变更处理
+const handleUrlChange = () => {
+  form.value.start_file_id = ''
+  form.value.start_file_name = ''
+  selectedStartFileName.value = ''
+}
 
 // 手动打开解析起始文件的对话框
 const openStartFileDialog = async () => {
@@ -385,6 +393,7 @@ const confirmStartFileSelection = () => {
     form.value.start_file_id = tempStartFileId.value
     const selected = shareFiles.value.find(f => f.id === tempStartFileId.value)
     if (selected) {
+      form.value.start_file_name = selected.name
       selectedStartFileName.value = selected.name
     }
   }
@@ -393,6 +402,7 @@ const confirmStartFileSelection = () => {
 
 const clearStartFile = () => {
   form.value.start_file_id = ''
+  form.value.start_file_name = ''
   selectedStartFileName.value = ''
   tempStartFileId.value = ''
   startFileDialogVisible.value = false
@@ -518,6 +528,7 @@ const handlePreview = async () => {
 const handleAccountChange = () => {
   form.value.save_path = '/'
   form.value.start_file_id = ''
+  form.value.start_file_name = ''
   selectedStartFileName.value = ''
   pathIdMap.value = { '/': '' }
 }
@@ -550,7 +561,7 @@ const confirmFolderSelection = () => {
 }
 
 const openAddDialog = () => {
-  form.value = { id: null, name: '', account_id: '', share_url: '', extract_code: '', save_path: '/', pattern: '', replacement: '', start_file_id: '' }
+  form.value = { id: null, name: '', account_id: '', share_url: '', extract_code: '', save_path: '/', pattern: '', replacement: '', start_file_id: '', start_file_name: '' }
   shareFiles.value = []
   selectedStartFileName.value = ''
   dialogVisible.value = true
@@ -558,8 +569,6 @@ const openAddDialog = () => {
 
 const handleEdit = async (row) => {
   shareFiles.value = []
-  // 初始回显 ID 信息
-  selectedStartFileName.value = row.start_file_id ? `载入中 (ID: ${row.start_file_id})...` : ''
   
   form.value = { 
     id: row.id,
@@ -570,28 +579,18 @@ const handleEdit = async (row) => {
     save_path: row.save_path,
     pattern: row.pattern,
     replacement: row.replacement,
-    start_file_id: row.start_file_id
+    start_file_id: row.start_file_id,
+    start_file_name: row.start_file_name
   }
-  dialogVisible.value = true
 
-  // 关键优化：如果带有起始文件 ID，尝试在后台找回文件名
-  if (row.start_file_id && row.share_url) {
-    try {
-      const data = await parseShareLink({
-        account_id: row.account_id,
-        share_url: row.share_url,
-        extract_code: row.extract_code
-      })
-      const found = data.find(f => f.id === row.start_file_id)
-      if (found) {
-        selectedStartFileName.value = found.name
-      } else {
-        selectedStartFileName.value = `ID: ${row.start_file_id} (文件在分享中已失效)`
-      }
-    } catch (err) {
-      selectedStartFileName.value = `ID: ${row.start_file_id}`
-    }
+  // 优化回显：如果数据库里有存文件名，直接秒开显示，不再请求后端
+  if (row.start_file_id) {
+    selectedStartFileName.value = row.start_file_name || `ID: ${row.start_file_id} (文件名未记录)`
+  } else {
+    selectedStartFileName.value = ''
   }
+
+  dialogVisible.value = true
 }
 
 const submitForm = async () => {

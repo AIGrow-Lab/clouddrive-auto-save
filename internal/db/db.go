@@ -45,9 +45,10 @@ type Task struct {
 	Filter      string `gorm:"size:500" json:"filter"`       // 过滤规则
 	
 	Cron        string `gorm:"size:100" json:"cron"`         // 任务独立 Cron (可选)
-	StartDate   *time.Time `json:"start_date"`               // 起始日期过滤 (可选)
-	StartFileID string     `gorm:"size:255" json:"start_file_id"` // 起始文件 ID (可选)
-	LastRun     time.Time  `json:"last_run"`
+	StartDate     *time.Time `json:"start_date"`               // 起始日期过滤 (可选)
+	StartFileID   string     `gorm:"size:255" json:"start_file_id"` // 起始文件 ID (可选)
+	StartFileName string     `gorm:"size:255" json:"start_file_name"` // 起始文件名称 (用于前端快速回显)
+	LastRun       time.Time  `json:"last_run"`
 
 	NextRun     time.Time `json:"next_run"`
 	Status      string `gorm:"size:20;default:'pending'" json:"status"` // pending, running, success, failed
