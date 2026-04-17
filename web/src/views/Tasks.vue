@@ -550,14 +550,23 @@ const loadFolders = async (node, resolve) => {
   const parentID = node.data.id
   const parentPath = node.data.path
   
+  // 仅在根目录加载时显示全局遮罩，子目录展开将利用 Tree 自带的 node-loading
   if (node.level === 1) {
     loadingFolders.value = true
   }
+  
   try {
     const folders = await getFolders(form.value.account_id, parentID, parentPath)
-    folders.forEach(f => {
-      pathIdMap.value[f.path] = f.id
-    })
+    
+    // 异步更新映射表，不阻塞渲染
+    setTimeout(() => {
+      const newMappings = {}
+      folders.forEach(f => {
+        newMappings[f.path] = f.id
+      })
+      Object.assign(pathIdMap.value, newMappings)
+    }, 0)
+    
     resolve(folders)
   } catch (err) {
     console.error('加载目录失败:', err)
@@ -927,6 +936,16 @@ html.dark .task-name-cell .name {
 .existed-tag {
   margin-left: 8px;
   flex-shrink: 0;
+}
+
+/* 彻底关闭目录树展开动画，消除“一行行刷新”的视觉差 */
+:deep(.el-tree-node__children) {
+  transition: none !important;
+}
+:deep(.el-collapse-transition-leave-active),
+:deep(.el-collapse-transition-enter-active) {
+  transition: none !important;
+  display: none !important;
 }
 
 .naked-radio :deep(.el-radio__label) {
