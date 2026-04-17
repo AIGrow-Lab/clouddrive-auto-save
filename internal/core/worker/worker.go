@@ -98,32 +98,56 @@ func (m *Manager) execute(task *db.Task) {
 		return
 	}
 
-	// 2.2 日期与 ID 过滤
+	// 2.2 获取目标目录已存在文件，用于去重跳过
+	log.Printf("[PROGRESS:%d:Checking:正在检查目标目录是否存在同名文件...]", task.ID)
+	targetID, err := driver.PrepareTargetPath(ctx, task.SavePath)
+	existingMap := make(map[string]bool)
+	if err == nil {
+		existingFiles, _ := driver.ListFiles(ctx, targetID)
+		for _, ef := range existingFiles {
+			existingMap[ef.Name] = true
+		}
+	}
+
+	// 2.3 日期、ID 过滤及同名去重
 	var filteredIDs []string
+	skippedCount := 0
 	for _, f := range files {
 		// 1. 检查日期过滤：如果设置了开始日期，且文件时间早于开始日期，则跳过
 		if task.StartDate != nil && !f.UpdateTime.IsZero() && f.UpdateTime.Before(*task.StartDate) {
 			continue
 		}
 
-		// 2. 检查 ID 截断：如果匹配到起始文件 ID
-		if task.StartFileID != "" && f.ID == task.StartFileID {
-			// 包含该文件本身
-			filteredIDs = append(filteredIDs, f.ID)
-			break
+		// 2. 检查 ID 截断
+		isStartFile := task.StartFileID != "" && f.ID == task.StartFileID
+
+		// 3. 检查同名跳过
+		if existingMap[f.Name] {
+			skippedCount++
+			if isStartFile {
+				break
+			}
+			continue
 		}
 
 		filteredIDs = append(filteredIDs, f.ID)
+		if isStartFile {
+			break
+		}
 	}
 
 	if len(filteredIDs) == 0 {
-		log.Printf("[PROGRESS:%d:Finished:无新文件需要转存]", task.ID)
-		m.finishTask(task, "success", "No new files to transfer (all filtered by date)")
+		msg := "无新文件需要转存"
+		if skippedCount > 0 {
+			msg = fmt.Sprintf("无新文件需要转存 (已跳过 %d 个同名文件)", skippedCount)
+		}
+		log.Printf("[PROGRESS:%d:Finished:%s]", task.ID, msg)
+		m.finishTask(task, "success", msg)
 		return
 	}
 
-	// 2.3 执行转存
-	log.Printf("[PROGRESS:%d:Saving:正在转存 %d 个文件...]", task.ID, len(filteredIDs))
+	// 2.4 执行转存
+	log.Printf("[PROGRESS:%d:Saving:正在转存 %d 个文件 (已跳过 %d 个同名文件)...]", task.ID, len(filteredIDs), skippedCount)
 	err = driver.SaveLink(ctx, task.ShareURL, task.ExtractCode, task.SavePath, filteredIDs)
 	if err != nil {
 		m.finishTask(task, "failed", err.Error())

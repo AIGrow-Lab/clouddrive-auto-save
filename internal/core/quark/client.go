@@ -599,7 +599,7 @@ func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath 
 	}
 	json.Unmarshal(resp, &detailRes)
 
-	targetID, err := q.prepareTargetPath(ctx, targetPath)
+	targetID, err := q.PrepareTargetPath(ctx, targetPath)
 	if err != nil {
 		log.Printf("[Quark] 转存失败 (准备目标路径失败): %v", err)
 		return err
@@ -640,7 +640,7 @@ func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath 
 	return nil
 }
 
-func (q *Quark) prepareTargetPath(ctx context.Context, path string) (string, error) {
+func (q *Quark) PrepareTargetPath(ctx context.Context, path string) (string, error) {
 	if path == "" || path == "/" {
 		return "0", nil
 	}

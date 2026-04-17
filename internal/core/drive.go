@@ -32,6 +32,8 @@ type CloudDrive interface {
 	// 分享转存相关
 	// ParseShare 解析分享链接，返回其中的文件列表
 	ParseShare(ctx context.Context, shareURL, extractCode string) ([]FileInfo, error)
+	// PrepareTargetPath 准备目标目录，返回目标目录的 ID。如果目录不存在则创建。
+	PrepareTargetPath(ctx context.Context, path string) (string, error)
 	// SaveFileTo 将特定的分享文件保存到目标路径
 	SaveFileTo(ctx context.Context, fileID, targetPath string) error
 	// SaveLink 将分享链接中的文件转存到指定目标目录。如果 fileIDs 不为空，则仅转存指定的文件。
