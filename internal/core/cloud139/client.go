@@ -904,7 +904,19 @@ func (c *Cloud139) getShareInfo(ctx context.Context, linkID, passwd, pCaID strin
 		codeStr := fmt.Sprintf("%v", code)
 		if codeStr != "0" && codeStr != "0000" && codeStr != "" {
 			log.Printf("[139] 接口返回错误码: %s, message: %v", codeStr, res["message"])
-			return nil, fmt.Errorf("139 getShareInfo error [%s]: %v", codeStr, res["message"])
+			
+			// 139 错误码映射表
+			errorMap := map[string]string{
+				"200000727": "分享链接不存在或已被取消。",
+				"200000728": "提取码错误，请检查后再试。",
+				"200000732": "该分享链接已超过有效期。",
+			}
+			
+			if friendlyMsg, ok := errorMap[codeStr]; ok {
+				return nil, fmt.Errorf("[Fatal] %s", friendlyMsg)
+			}
+			// 其余错误降级为普通 error
+			return nil, fmt.Errorf("%v", res["message"])
 		}
 	}
 

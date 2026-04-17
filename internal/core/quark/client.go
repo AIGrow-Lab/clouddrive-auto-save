@@ -139,7 +139,34 @@ func (q *Quark) doRequest(ctx context.Context, method, apiURL string, query url.
 
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("[Quark Debug] 请求异常: %s %s, StatusCode=%d, Body=%s", method, fullURL, resp.StatusCode, string(respBody))
-		return nil, fmt.Errorf("Quark API HTTP error: %d, body: %s", resp.StatusCode, string(respBody))
+
+		var errResp map[string]interface{}
+		errMsg := fmt.Sprintf("HTTP 错误 %d", resp.StatusCode)
+
+		if err := json.Unmarshal(respBody, &errResp); err == nil {
+			codeVal := errResp["code"]
+			codeStr := fmt.Sprintf("%v", codeVal)
+
+			// 夸克错误码映射表
+			errorMap := map[string]string{
+				"41010": "该分享文件涉及违规内容，已被官方屏蔽。",
+				"24000": "提取码不正确，请重新输入。",
+				"24001": "该分享已失效，可能已被取消或删除。",
+				"20002": "账号登录已失效，请更新 Cookie。",
+			}
+
+			if mappedMsg, ok := errorMap[codeStr]; ok {
+				errMsg = mappedMsg
+			} else if msg, ok := errResp["message"].(string); ok && msg != "" {
+				errMsg = msg
+			}
+		}
+
+		// 针对 400/404 或特定错误码，打上 [Fatal] 标记以供上层阻断
+		if resp.StatusCode == 404 || resp.StatusCode == 400 {
+			return nil, fmt.Errorf("[Fatal] %s", errMsg)
+		}
+		return nil, fmt.Errorf("%s", errMsg)
 	}
 
 	// 广播响应到仪表盘
