@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/zcq/clouddrive-auto-save/internal/api"
+	"github.com/zcq/clouddrive-auto-save/internal/core/scheduler"
 	"github.com/zcq/clouddrive-auto-save/internal/core/worker"
 	"github.com/zcq/clouddrive-auto-save/internal/db"
 	"github.com/zcq/clouddrive-auto-save/internal/utils"
@@ -38,6 +39,20 @@ func main() {
 	wm := worker.NewManager(3)
 	wm.Start()
 	defer wm.Stop()
+
+	// 2.5 启动定时调度器
+	scheduler.Init(wm)
+	scheduler.Global.Start()
+	defer scheduler.Global.Stop()
+
+	// 加载现有定时任务
+	var tasks []db.Task
+	db.DB.Find(&tasks)
+	for _, t := range tasks {
+		if t.Cron != "" {
+			scheduler.Global.UpdateTask(t.ID, t.Cron)
+		}
+	}
 
 	// 3. 启动 API 服务
 	log.Println("Starting API server on 127.0.0.1:8080...")

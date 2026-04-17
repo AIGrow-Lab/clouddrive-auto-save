@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/zcq/clouddrive-auto-save/internal/core"
+	"github.com/zcq/clouddrive-auto-save/internal/core/scheduler"
 	_ "github.com/zcq/clouddrive-auto-save/internal/core/cloud139"
 	_ "github.com/zcq/clouddrive-auto-save/internal/core/quark"
 	"github.com/zcq/clouddrive-auto-save/internal/core/worker"
@@ -191,6 +192,12 @@ func createTask(c *gin.Context) {
 	}
 	log.Printf("[API] 创建任务: %s", task.Name)
 	db.DB.Create(&task)
+
+	// 注册定时任务
+	if task.Cron != "" {
+		scheduler.Global.UpdateTask(task.ID, task.Cron)
+	}
+
 	c.PureJSON(http.StatusOK, task)
 }
 
@@ -236,12 +243,19 @@ func updateTask(c *gin.Context) {
 		return
 	}
 
+	// 刷新调度器
+	scheduler.Global.UpdateTask(task.ID, task.Cron)
+
 	c.PureJSON(http.StatusOK, task)
 }
 
 func deleteTask(c *gin.Context) {
 	id := c.Param("id")
 	log.Printf("[API] 删除任务: ID=%s", id)
+
+	idNum, _ := strconv.Atoi(id)
+	scheduler.Global.RemoveTask(uint(idNum))
+
 	db.DB.Delete(&db.Task{}, id)
 	c.PureJSON(http.StatusOK, gin.H{"message": "task deleted"})
 }
