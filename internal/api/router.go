@@ -201,12 +201,41 @@ func updateTask(c *gin.Context) {
 		c.PureJSON(http.StatusNotFound, gin.H{"error": "task not found"})
 		return
 	}
+
+	// 记录更新前的关键参数，用于判断是否需要重置状态
+	oldURL := task.ShareURL
+	oldCode := task.ExtractCode
+
 	if err := c.ShouldBindJSON(&task); err != nil {
 		c.PureJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	log.Printf("[API] 更新任务: %s", task.Name)
-	db.DB.Save(&task)
+
+	updateData := map[string]interface{}{
+		"name":            task.Name,
+		"account_id":      task.AccountID,
+		"share_url":       task.ShareURL,
+		"extract_code":    task.ExtractCode,
+		"save_path":       task.SavePath,
+		"pattern":         task.Pattern,
+		"replacement":     task.Replacement,
+		"start_file_id":   task.StartFileID,
+		"start_file_name": task.StartFileName,
+	}
+
+	// 仅当分享链接或提取码发生变动时，才重置状态以解除 [Fatal] 封锁
+	if task.ShareURL != oldURL || task.ExtractCode != oldCode {
+		log.Printf("[API] 检测到关键参数变更，自动重置任务状态: %s", task.Name)
+		updateData["status"] = "pending"
+		updateData["message"] = ""
+	}
+
+	if err := db.DB.Model(&task).Updates(updateData).Error; err != nil {
+		c.PureJSON(http.StatusInternalServerError, gin.H{"error": "update failed"})
+		return
+	}
+
 	c.PureJSON(http.StatusOK, task)
 }
 
