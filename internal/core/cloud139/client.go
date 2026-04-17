@@ -790,14 +790,10 @@ func (c *Cloud139) RenameFile(ctx context.Context, fileID, newName string) error
 	sign := c.computeMcloudSign("/")
 	headers := map[string]string{"mcloud-sign": sign, "INNER-HCY-ROUTER-HTTPS": "1"}
 	body := map[string]interface{}{
-		"fileUpdateList": []map[string]interface{}{
-			{
-				"fileId":   fileID,
-				"fileName": newName,
-			},
-		},
+		"fileId": fileID,
+		"name":   newName,
 	}
-	_, err := c.doRequest(ctx, "POST", PersonalKdNjsURL+"/hcy/file/batchUpdate", body, headers)
+	_, err := c.doRequest(ctx, "POST", PersonalKdNjsURL+"/hcy/file/update", body, headers)
 	return err
 }
 
