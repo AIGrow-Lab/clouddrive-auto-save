@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -336,60 +337,71 @@ func (q *Quark) ListFiles(ctx context.Context, parentID string) ([]core.FileInfo
 		parentID = "0"
 	}
 	log.Printf("[Quark] 正在列出目录文件: FID=%s", parentID)
-	apiURL := BaseURL + "/1/clouddrive/file/sort"
-	query := url.Values{}
-	query.Set("pdir_fid", parentID)
-	query.Set("_page", "1")
-	query.Set("_size", "100")
-	query.Set("_sort", "file_type:asc,updated_at:desc")
-	query.Set("_fetch_total", "1")
-	query.Set("fetch_risk_file_name", "1")
-	query.Set("pr", "ucpro")
-	query.Set("fr", "pc")
 
-	resp, err := q.doRequest(ctx, "GET", apiURL, query, nil, false)
-	if err != nil {
-		log.Printf("[Quark] 列出目录请求失败: %v", err)
-		return nil, err
+	var allFiles []core.FileInfo
+	page := 1
+	pageSize := 1000
+
+	for {
+		apiURL := BaseURL + "/1/clouddrive/file/sort"
+		query := url.Values{}
+		query.Set("pdir_fid", parentID)
+		query.Set("_page", strconv.Itoa(page))
+		query.Set("_size", strconv.Itoa(pageSize))
+		query.Set("_sort", "file_type:asc,updated_at:desc")
+		query.Set("_fetch_total", "1")
+		query.Set("pr", "ucpro")
+		query.Set("fr", "pc")
+
+		resp, err := q.doRequest(ctx, "GET", apiURL, query, nil, false)
+		if err != nil {
+			log.Printf("[Quark] 列出目录请求失败: %v", err)
+			return nil, err
+		}
+
+		var res struct {
+			Code interface{} `json:"code"`
+			Data struct {
+				List  []map[string]interface{} `json:"list"`
+				Total float64                  `json:"total"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(resp, &res); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal quark response: %v", err)
+		}
+
+		codeStr := fmt.Sprintf("%v", res.Code)
+		if codeStr != "0" && codeStr != "0.0" {
+			return nil, fmt.Errorf("Quark API error: %v", res.Code)
+		}
+
+		for _, item := range res.Data.List {
+			fid, _ := item["fid"].(string)
+			fileName, _ := item["file_name"].(string)
+			dir, _ := item["dir"].(bool)
+			sizeVal, _ := item["size"].(float64)
+			updateAtVal, _ := item["updated_at"].(float64)
+
+			updateTime := time.Unix(int64(updateAtVal)/1000, 0)
+			allFiles = append(allFiles, core.FileInfo{
+				ID:         fid,
+				Name:       fileName,
+				Path:       fid,
+				IsFolder:   dir,
+				Size:       int64(sizeVal),
+				UpdatedAt:  updateTime.Format("2006-01-02 15:04:05"),
+				UpdateTime: updateTime,
+			})
+		}
+
+		if int64(len(allFiles)) >= int64(res.Data.Total) || len(res.Data.List) == 0 || page >= 10 {
+			break
+		}
+		page++
 	}
 
-	var res struct {
-		Code interface{} `json:"code"`
-		Data struct {
-			List []map[string]interface{} `json:"list"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(resp, &res); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal quark response: %v", err)
-	}
-
-	codeStr := fmt.Sprintf("%v", res.Code)
-	if codeStr != "0" && codeStr != "0.0" {
-		log.Printf("[Quark] 列出目录接口返回错误: %v", res.Code)
-		return nil, fmt.Errorf("Quark API error: %v", res.Code)
-	}
-
-	var files []core.FileInfo
-	for _, item := range res.Data.List {
-		fid, _ := item["fid"].(string)
-		fileName, _ := item["file_name"].(string)
-		dir, _ := item["dir"].(bool)
-		sizeVal, _ := item["size"].(float64)
-		updateAtVal, _ := item["updated_at"].(float64)
-
-		updateTime := time.Unix(int64(updateAtVal)/1000, 0)
-		files = append(files, core.FileInfo{
-			ID:         fid,
-			Name:       fileName,
-			Path:       fid,
-			IsFolder:   dir,
-			Size:       int64(sizeVal),
-			UpdatedAt:  updateTime.Format("2006-01-02 15:04:05"),
-			UpdateTime: updateTime,
-		})
-	}
-	log.Printf("[Quark] 目录列出完成: FID=%s, 发现 %d 个项", parentID, len(files))
-	return files, nil
+	log.Printf("[Quark] 目录列出完成: FID=%s, 发现 %d 个项", parentID, len(allFiles))
+	return allFiles, nil
 }
 
 func (q *Quark) CreateFolder(ctx context.Context, parentID, name string) (*core.FileInfo, error) {
@@ -556,6 +568,37 @@ func (q *Quark) ParseShare(ctx context.Context, shareURL, extractCode string) ([
 	}
 	log.Printf("[Quark] 解析分享完成: 发现 %d 个项", len(files))
 	return files, nil
+}
+
+func (q *Quark) RenameFile(ctx context.Context, fileID, newName string) error {
+	apiURL := BaseURL + "/1/clouddrive/file/rename"
+	query := url.Values{}
+	query.Set("pr", "ucpro")
+	query.Set("fr", "pc")
+
+	body := map[string]interface{}{
+		"fid":       fileID,
+		"file_name": newName,
+	}
+	jsonBody, _ := json.Marshal(body)
+	resp, err := q.doRequest(ctx, "POST", apiURL, query, strings.NewReader(string(jsonBody)), false)
+	if err != nil {
+		return err
+	}
+
+	var res struct {
+		Code interface{} `json:"code"`
+		Msg  string      `json:"message"`
+	}
+	if err := json.Unmarshal(resp, &res); err != nil {
+		return err
+	}
+
+	codeStr := fmt.Sprintf("%v", res.Code)
+	if codeStr != "0" && codeStr != "0.0" && codeStr != "OK" {
+		return fmt.Errorf("Quark Rename error [%s]: %s", codeStr, res.Msg)
+	}
+	return nil
 }
 
 func (q *Quark) SaveFileTo(ctx context.Context, fileID, targetPath string) error {

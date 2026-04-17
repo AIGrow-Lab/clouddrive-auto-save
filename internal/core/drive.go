@@ -17,6 +17,7 @@ type FileInfo struct {
 	UpdatedAt  string    `json:"updated_at"`
 	UpdateTime time.Time `json:"-"`          // 解析后的标准时间
 	IsExisted  bool      `json:"is_existed"` // 标记是否已在目标目录存在
+	NewName    string    `json:"new_name"`   // 重命名后的预览名
 }
 
 // CloudDrive 定义了所有云盘必须实现的标准接口
@@ -35,6 +36,8 @@ type CloudDrive interface {
 	ParseShare(ctx context.Context, shareURL, extractCode string) ([]FileInfo, error)
 	// PrepareTargetPath 准备目标目录，返回目标目录的 ID。如果目录不存在则创建。
 	PrepareTargetPath(ctx context.Context, path string) (string, error)
+	// RenameFile 修改文件名或目录名
+	RenameFile(ctx context.Context, fileID, newName string) error
 	// SaveFileTo 将特定的分享文件保存到目标路径
 	SaveFileTo(ctx context.Context, fileID, targetPath string) error
 	// SaveLink 将分享链接中的文件转存到指定目标目录。如果 fileIDs 不为空，则仅转存指定的文件。

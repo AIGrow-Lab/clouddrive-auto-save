@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/zcq/clouddrive-auto-save/internal/core"
+	"github.com/zcq/clouddrive-auto-save/internal/core/renamer"
 	"github.com/zcq/clouddrive-auto-save/internal/db"
 )
 
@@ -110,7 +111,9 @@ func (m *Manager) execute(task *db.Task) {
 	}
 
 	// 2.3 日期、ID 过滤及同名去重
+	renameProc := renamer.NewProcessor()
 	var filteredIDs []string
+	renameMap := make(map[string]string) // 记录 OriginalName -> NewName 的映射，用于后续重命名
 	skippedCount := 0
 	for _, f := range files {
 		// 1. 检查日期过滤：如果设置了开始日期，且文件时间早于开始日期，则跳过
@@ -121,8 +124,22 @@ func (m *Manager) execute(task *db.Task) {
 		// 2. 检查 ID 截断
 		isStartFile := task.StartFileID != "" && f.ID == task.StartFileID
 
-		// 3. 检查同名跳过
-		if existingMap[f.Name] {
+		// 计算该文件经过重命名后的目标名称
+		targetName := f.Name
+		if task.Pattern != "" || task.Replacement != "" {
+			opts := renamer.RenameOptions{
+				TaskName:    task.Name,
+				Pattern:     task.Pattern,
+				Replacement: task.Replacement,
+				FileName:    f.Name,
+			}
+			if newName, err := renameProc.Process(opts); err == nil {
+				targetName = newName
+			}
+		}
+
+		// 3. 检查同名跳过 (基于重命名后的名称进行检查)
+		if existingMap[targetName] {
 			skippedCount++
 			if isStartFile {
 				break
@@ -131,6 +148,10 @@ func (m *Manager) execute(task *db.Task) {
 		}
 
 		filteredIDs = append(filteredIDs, f.ID)
+		if targetName != f.Name {
+			renameMap[f.Name] = targetName
+		}
+
 		if isStartFile {
 			break
 		}
@@ -154,7 +175,20 @@ func (m *Manager) execute(task *db.Task) {
 		return
 	}
 
-	// 3. TODO: 执行重命名引擎逻辑 (后续实现)
+	// 3. 执行重命名同步逻辑
+	if len(renameMap) > 0 {
+		log.Printf("[PROGRESS:%d:Renaming:正在同步执行网盘内重命名...]", task.ID)
+		// 转存完成后，重新拉取目录以获取新产生的文件 ID
+		targetFiles, err := driver.ListFiles(ctx, targetID)
+		if err == nil {
+			for _, tf := range targetFiles {
+				if newName, ok := renameMap[tf.Name]; ok {
+					log.Printf("[Worker:%d] 正在重命名: %s -> %s", task.ID, tf.Name, newName)
+					_ = driver.RenameFile(ctx, tf.ID, newName)
+				}
+			}
+		}
+	}
 
 	log.Printf("[PROGRESS:%d:Finished:转存任务全部完成]", task.ID)
 	m.finishTask(task, "success", "Transfer completed successfully")

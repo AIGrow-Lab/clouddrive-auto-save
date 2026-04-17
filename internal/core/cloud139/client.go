@@ -786,6 +786,21 @@ func (c *Cloud139) SaveLink(ctx context.Context, shareURL, extractCode, targetPa
 	return nil
 }
 
+func (c *Cloud139) RenameFile(ctx context.Context, fileID, newName string) error {
+	sign := c.computeMcloudSign("/")
+	headers := map[string]string{"mcloud-sign": sign, "INNER-HCY-ROUTER-HTTPS": "1"}
+	body := map[string]interface{}{
+		"fileUpdateList": []map[string]interface{}{
+			{
+				"fileId":   fileID,
+				"fileName": newName,
+			},
+		},
+	}
+	_, err := c.doRequest(ctx, "POST", PersonalKdNjsURL+"/hcy/file/batchUpdate", body, headers)
+	return err
+}
+
 func (c *Cloud139) DeleteFile(ctx context.Context, fileID string) error {
 	sign := c.computeMcloudSign("/")
 	headers := map[string]string{"mcloud-sign": sign, "INNER-HCY-ROUTER-HTTPS": "1"}
