@@ -52,7 +52,7 @@
             <el-button-group>
               <el-button 
                 link 
-                type="primary" 
+                type="success" 
                 :icon="Play" 
                 :disabled="row.status === 'running' || !!(row.message && row.message.includes('[Fatal]'))" 
                 @click="handleRun(row)"
