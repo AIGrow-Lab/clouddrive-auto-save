@@ -377,8 +377,15 @@ const scrollToBottom = () => {
 const clearLogs = async () => {
   try {
     await clearLogsAPI()
+    // 1. 清空左侧终端日志
     logs.value = []
-    ElMessage.success('日志已彻底清空')
+    
+    // 2. 清理右侧监控面板中已结束的任务，保留运行中的
+    runningTasks.value = runningTasks.value.filter(task => 
+      task.percent < 100 && task.stage !== 'Success' && task.stage !== 'Failed'
+    )
+    
+    ElMessage.success('日志与已完成任务已清空')
   } catch (err) {
     console.error('清空日志失败:', err)
     ElMessage.error('清空日志失败')
