@@ -14,22 +14,8 @@
 | `capacity_used` | int64 | 所有活跃账号已使用的云盘空间总和 (Bytes) |
 | `scheduled_tasks` | int64 | 当前已规划自动调度的任务总数 |
 | `today_completed` | int64 | 今日（零点起）成功执行完成的任务次数 |
-| `running_tasks_list`| Array | **[新]** 当前正在执行中或最近完成的任务详情列表 |
-| `recent_activities`| Array | 最近执行过的 5 条任务历史记录列表 |
-
-### 响应示例
-```json
-{
-  "active_accounts": 2,
-  "capacity_used": 103291877039,
-  "scheduled_tasks": 3,
-  "today_completed": 5,
-  "running_tasks_list": [
-    { "id": 1, "name": "测试任务", "percent": 35, "stage": "Checking", ... }
-  ],
-  "recent_activities": [...]
-}
-```
+| `running_tasks_list`| Array | **[新]** 当前正在执行中、最近报错或最近 8 秒内成功且未被清空的活跃任务列表 |
+| `recent_activities`| Array | 最近执行过的 15 条有消息记录的任务历史列表 |
 
 ---
 
@@ -62,9 +48,10 @@
 
 ---
 
-## 4. 清空日志历史
-清空后端内存中缓存的所有日志记录。
+## 4. 清空系统日志与状态
+清空后端内存中缓存的所有日志记录，并同步重置所有任务的运行摘要。
 
 - **URL**: `/dashboard/logs/recent`
 - **Method**: `DELETE`
-- **Response**: `{"message": "logs cleared"}`
+- **Response**: `{"message": "logs and task summaries cleared"}`
+- **Side Effect**: 此操作会同时清空数据库中所有任务的 `message` 和 `stage` 字段，使仪表盘视图回归纯净状态。
