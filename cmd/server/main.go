@@ -34,6 +34,12 @@ func main() {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
+	// 1.5 清理异常中断的任务（重置卡在 running 状态的任务）
+	db.DB.Model(&db.Task{}).Where("status = ?", "running").Updates(map[string]interface{}{
+		"status":  "pending",
+		"message": "服务重启，已重置执行状态",
+	})
+
 	// 2. 启动任务管理器 (并发数为 3)
 	log.Println("Starting worker manager...")
 	wm := worker.NewManager(3)
