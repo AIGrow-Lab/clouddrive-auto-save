@@ -73,8 +73,13 @@ func performAccountCheck(account *db.Account, ctx context.Context) error {
 
 	updatedAccount, err := driver.GetInfo(ctx)
 	if err != nil {
+		now := time.Now()
 		account.Status = 0
-		db.DB.Model(account).Update("status", 0)
+		account.LastCheck = now
+		db.DB.Model(account).Updates(map[string]interface{}{
+			"status":     0,
+			"last_check": now,
+		})
 		return err
 	}
 
@@ -193,6 +198,15 @@ func createTask(c *gin.Context) {
 		c.PureJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	// 校验 Cron 表达式
+	if task.ScheduleMode == "custom" {
+		if err := scheduler.ValidateCron(task.Cron); err != nil {
+			c.PureJSON(http.StatusBadRequest, gin.H{"error": "Cron 表达式格式错误: " + err.Error()})
+			return
+		}
+	}
+
 	log.Printf("[API] 创建任务: %s", task.Name)
 	db.DB.Create(&task)
 
@@ -218,6 +232,15 @@ func updateTask(c *gin.Context) {
 		c.PureJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	// 校验 Cron 表达式
+	if task.ScheduleMode == "custom" {
+		if err := scheduler.ValidateCron(task.Cron); err != nil {
+			c.PureJSON(http.StatusBadRequest, gin.H{"error": "Cron 表达式格式错误: " + err.Error()})
+			return
+		}
+	}
+
 	log.Printf("[API] 更新任务: %s", task.Name)
 
 	updateData := map[string]interface{}{
@@ -363,6 +386,14 @@ func updateScheduleSettings(c *gin.Context) {
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.PureJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	// 校验全局 Cron 表达式
+	if input.Enabled {
+		if err := scheduler.ValidateCron(input.Cron); err != nil {
+			c.PureJSON(http.StatusBadRequest, gin.H{"error": "全局 Cron 表达式格式错误: " + err.Error()})
+			return
+		}
 	}
 
 	enabledStr := "false"

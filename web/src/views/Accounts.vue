@@ -264,20 +264,25 @@ const submitForm = async () => {
       }
     }
     dialogVisible.value = false
-    fetchList()
   } catch (err) {
     console.error(err)
   } finally {
     submitting.value = false
+    fetchList()
   }
 }
 
 const handleCheck = async (row) => {
   try {
-    await checkAccount(row.id)
+    const updatedAccount = await checkAccount(row.id)
+    Object.assign(row, updatedAccount)
     ElMessage.success('账号状态正常')
-    fetchList()
-  } catch (err) {}
+  } catch (err) {
+    // 错误已由拦截器展示，这里从错误响应中尝试提取后端更新后的账号状态 (包含最新的校验时间)
+    if (err.response && err.response.data && err.response.data.account) {
+      Object.assign(row, err.response.data.account)
+    }
+  }
 }
 
 const handleDelete = (row) => {
