@@ -1,18 +1,15 @@
-# Optimize Cron Input Validation Plan
+# 优化 Cron 输入校验计划
 
-**Goal:** Improve the user experience and system reliability by validating custom Cron expressions both on the frontend (UI hints/validation) and backend (API rejection).
+**目标：** 通过在前端提供引导提示以及在后端增加 API 拦截，验证自定义 Cron 表达式，提升用户体验和系统稳定性。
 
-**Changes:**
+**修改内容：**
 
-### 1. Backend (`internal/core/scheduler/scheduler.go`)
-- Implement a `ValidateCron(cronExpr string) error` function. Since we use `cron.WithSeconds()`, the easiest reliable way to validate is by temporarily instantiating `cron.New(cron.WithSeconds())` and calling `AddFunc` with an empty function to capture any parsing errors.
+### 1. 后端逻辑 (`internal/core/scheduler/scheduler.go`)
+- 实现 `ValidateCron(cronExpr string) error` 函数。通过临时实例化 `cron.New(cron.WithSeconds())` 并尝试添加该表达式来捕获解析错误。
 
-### 2. Backend API (`internal/api/router.go`)
-- In `createTask` and `updateTask`: Before saving to the database, check if `task.ScheduleMode == "custom"`. If so, validate `task.Cron` using `scheduler.ValidateCron`. Return a `400 Bad Request` with a user-friendly error message if it's invalid.
-- In `updateScheduleSettings`: Validate the `input.Cron` using `scheduler.ValidateCron` before saving it to the database or updating the global schedule.
+### 2. 后端 API (`internal/api/router.go`)
+- 在创建、更新任务及修改全局设置时，调用该校验函数。如果格式非法，返回 `400 Bad Request` 并提供具体的错误描述。
 
-### 3. Frontend (`web/src/views/Tasks.vue`)
-- Ensure the `cron` input fields (both in the global settings card and the task dialog) have clear placeholders.
-- Leverage the backend's validation errors (which will now cleanly return 400 with the exact parsing failure) by relying on the existing axios interceptor. To improve UX further, we can add a small tip underneath the input box explaining the 6-field format: `秒 分 时 日 月 周`.
-
-This plan ensures that no invalid cron expressions can ever enter the database or crash the scheduler logic silently.
+### 3. 前端 UI (`web/src/views/Tasks.vue`)
+- 为 Cron 输入框增加清晰的占位符（如 `秒 分 时 日 月 周`）。
+- 增加 Tooltip 提示，解释 6 位表达式的格式，极大降低使用门槛。
