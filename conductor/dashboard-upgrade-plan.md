@@ -42,7 +42,7 @@
 - [ ] **Step 3: 对接 EventSource**
   在 `onMounted` 中建立与 `/api/dashboard/logs` 的连接，将收到的日志实时追加到终端组件中。
 
-### Task 3: 实现任务微进度展示
+### Task 3: 实现任务执行监控展示
 
 **Files:**
 - Modify: `internal/core/worker/worker.go`
