@@ -12,7 +12,7 @@
 | :--- | :--- | :--- |
 | `active_accounts` | int64 | 当前状态正常的云盘账号总数 |
 | `capacity_used` | int64 | 所有活跃账号已使用的云盘空间总和 (Bytes) |
-| `running_tasks` | int64 | 当前正在执行中的转存任务数量 |
+| `scheduled_tasks` | int64 | 当前已规划自动调度的任务总数 |
 | `today_completed` | int64 | 今日（零点起）成功执行完成的任务次数 |
 | `recent_activities`| Array | 最近执行过的 5 条任务记录列表 |
 
@@ -21,7 +21,7 @@
 {
   "active_accounts": 2,
   "capacity_used": 103291877039,
-  "running_tasks": 0,
+  "scheduled_tasks": 3,
   "today_completed": 5,
   "recent_activities": [
     {

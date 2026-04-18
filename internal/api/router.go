@@ -307,8 +307,19 @@ func runTask(c *gin.Context) {
 }
 
 func getDashboardStats(c *gin.Context) {
-	var runningTasks int64
-	db.DB.Model(&db.Task{}).Where("status = ?", "running").Count(&runningTasks)
+	// 获取全局调度开关状态
+	var enabledSetting db.Setting
+	db.DB.Where("key = ?", "global_schedule_enabled").First(&enabledSetting)
+	globalEnabled := enabledSetting.Value == "true"
+
+	var scheduledTasks int64
+	if globalEnabled {
+		// 全局开启：统计模式为 global 的任务 + 模式为 custom 且有 cron 的任务
+		db.DB.Model(&db.Task{}).Where("schedule_mode = ? OR (schedule_mode = ? AND cron != '')", "global", "custom").Count(&scheduledTasks)
+	} else {
+		// 全局关闭：仅统计模式为 custom 且有 cron 的任务
+		db.DB.Model(&db.Task{}).Where("schedule_mode = ? AND cron != ''", "custom").Count(&scheduledTasks)
+	}
 
 	var capacityUsed int64
 	db.DB.Model(&db.Account{}).Where("status = 1").Select("SUM(capacity_used)").Scan(&capacityUsed)
@@ -323,7 +334,7 @@ func getDashboardStats(c *gin.Context) {
 	db.DB.Order("last_run desc").Limit(5).Find(&recentTasks)
 
 	c.PureJSON(http.StatusOK, gin.H{
-		"running_tasks":     runningTasks,
+		"scheduled_tasks":   scheduledTasks,
 		"capacity_used":     capacityUsed,
 		"today_completed":   todayCompleted,
 		"active_accounts":   activeAccounts,
