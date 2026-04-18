@@ -177,7 +177,7 @@ import {
   X
 } from 'lucide-vue-next'
 import { getStats, clearLogsAPI } from '../api/dashboard'
-import { runTask } from '../api/task'
+import { runTask, dismissTask as runDismissTask } from '../api/task'
 import { ElMessage } from 'element-plus'
 
 const stats = reactive({
@@ -332,12 +332,15 @@ const handleProgressMessage = (msg) => {
   }
 }
 
-const dismissTask = (taskId) => {
-  // 注意：这里手动关闭只是前端临时移除，如果后端 DB 依然返回该任务（在15秒内），下次轮询会重新出现
-  // 建议让其自然消失，或在这里调用后端接口标记已读（目前暂简单移除）
-  const idx = runningTasks.value.findIndex(t => String(t.id) === String(taskId))
-  if (idx > -1) {
-    runningTasks.value.splice(idx, 1)
+const dismissTask = async (taskId) => {
+  try {
+    await runDismissTask(taskId)
+    const idx = runningTasks.value.findIndex(t => String(t.id) === String(taskId))
+    if (idx > -1) {
+      runningTasks.value.splice(idx, 1)
+    }
+  } catch (err) {
+    console.error('忽略任务失败:', err)
   }
 }
 
