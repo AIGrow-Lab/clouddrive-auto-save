@@ -33,12 +33,23 @@
             <span class="action-label">调度频率:</span>
             <el-input 
               v-model="globalSchedule.cron" 
-              placeholder="Cron 表达式" 
+              placeholder="秒 分 时 日 月 周" 
               style="width: 220px"
               @blur="saveGlobalSettings"
+              @keyup.enter="saveGlobalSettings"
             >
               <template #suffix>
-                <el-tooltip content="秒 分 时 日 月 周 (例如 0 0 2 * * * 每天凌晨2点)" placement="top">
+                <el-tooltip placement="top">
+                  <template #content>
+                    标准 6 位表达式：<br/>
+                    1. 秒 (0-59)<br/>
+                    2. 分 (0-59)<br/>
+                    3. 时 (0-23)<br/>
+                    4. 日 (1-31)<br/>
+                    5. 月 (1-12)<br/>
+                    6. 周 (0-6)<br/>
+                    例如: 0 0 2 * * * (每天凌晨2点)
+                  </template>
                   <el-icon style="cursor: help"><Info /></el-icon>
                 </el-tooltip>
               </template>
@@ -251,7 +262,17 @@
                   <el-option label="每周一凌晨 2 点" value="0 0 2 * * 1" />
                   <el-option label="使用自定义表达式" value="custom" />
                 </el-select>
-                <el-input v-if="cronPreset === 'custom'" v-model="form.cron" placeholder="Cron 表达式 (秒 分 时 日 月 周)" style="flex: 1" />
+                <el-input v-if="cronPreset === 'custom'" v-model="form.cron" placeholder="秒 分 时 日 月 周" style="flex: 1">
+                  <template #suffix>
+                    <el-tooltip placement="top">
+                      <template #content>
+                        格式：秒 分 时 日 月 周 (6位)<br/>
+                        例如: */5 * * * * * (每5秒执行一次)
+                      </template>
+                      <el-icon style="cursor: help"><Info /></el-icon>
+                    </el-tooltip>
+                  </template>
+                </el-input>
               </div>
             </el-form-item>
           </el-col>
@@ -885,8 +906,11 @@ const handleRun = async (row) => {
   try {
     await runTask(row.id)
     ElMessage.success('任务已提交执行队列')
+  } catch (err) {
+    // 错误已由拦截器展示
+  } finally {
     fetchList()
-  } catch (err) {}
+  }
 }
 
 const handleDelete = (row) => {

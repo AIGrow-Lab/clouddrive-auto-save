@@ -42,6 +42,16 @@ func (s *Scheduler) Stop() {
 	log.Println("[Scheduler] Stopped")
 }
 
+// ValidateCron 验证给定的 Cron 表达式是否有效
+func ValidateCron(cronExpr string) error {
+	if strings.TrimSpace(cronExpr) == "" {
+		return nil
+	}
+	tempCron := cron.New(cron.WithSeconds())
+	_, err := tempCron.AddFunc(cronExpr, func() {})
+	return err
+}
+
 func (s *Scheduler) RemoveTask(taskID uint) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
