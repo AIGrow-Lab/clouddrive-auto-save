@@ -40,6 +40,7 @@ func InitRouter(wm *worker.Manager) *gin.Engine {
 		api.PUT("/tasks/:id", updateTask)
 		api.DELETE("/tasks/:id", deleteTask)
 		api.POST("/tasks/:id/run", runTask)
+		api.POST("/tasks/:id/dismiss", dismissTaskAPI)
 		api.POST("/tasks/preview", previewTask)
 		api.POST("/tasks/parse_share", parseShareLinkInfo)
 
@@ -316,12 +317,25 @@ func runTask(c *gin.Context) {
 
 	// 立即更新状态并推送
 	task.Status = "running"
-	db.DB.Model(&task).Update("status", "running")
+	task.Stage = "Started" // 重置 Dismissed 状态
+	db.DB.Model(&task).Updates(map[string]interface{}{
+		"status": "running",
+		"stage":  "Started",
+	})
 	utils.BroadcastTaskUpdate(&task)
 	utils.BroadcastStatsUpdate()
 
 	WorkerManager.Submit(worker.Job{Task: &task})
 	c.PureJSON(http.StatusOK, gin.H{"message": "task submitted to worker pool"})
+}
+
+func dismissTaskAPI(c *gin.Context) {
+	id := c.Param("id")
+	if err := db.DB.Model(&db.Task{}).Where("id = ?", id).Update("stage", "Dismissed").Error; err != nil {
+		c.PureJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.PureJSON(http.StatusOK, gin.H{"message": "task dismissed"})
 }
 
 func getDashboardStats(c *gin.Context) {
@@ -349,9 +363,9 @@ func getDashboardStats(c *gin.Context) {
 	db.DB.Model(&db.Account{}).Where("status = 1").Count(&activeAccounts)
 
 	var runningTasksList []db.Task
-	// 获取：运行中、失败、以及 15 秒内成功的任务
-	db.DB.Where("status = ? OR status = ? OR (status = ? AND last_run >= ?)",
-		"running", "failed", "success", time.Now().Add(-15*time.Second)).Find(&runningTasksList)
+	// 获取：运行中、15 秒内成功的任务、以及未被忽略（Dismissed）的失败任务
+	db.DB.Where("status = ? OR (status = ? AND last_run >= ?) OR (status = ? AND stage != ?)",
+		"running", "success", time.Now().Add(-15*time.Second), "failed", "Dismissed").Find(&runningTasksList)
 
 	var recentTasks []db.Task
 	db.DB.Order("last_run desc").Limit(5).Find(&recentTasks)

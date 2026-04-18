@@ -37,6 +37,13 @@ export function runTask(id) {
   })
 }
 
+export function dismissTask(id) {
+  return request({
+    url: `/tasks/${id}/dismiss`,
+    method: 'post'
+  })
+}
+
 export function previewTask(data) {
   return request({
     url: '/tasks/preview',
