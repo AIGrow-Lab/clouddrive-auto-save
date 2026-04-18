@@ -11,7 +11,7 @@
 1. [仪表盘统计 (Dashboard)](./dashboard.md) - 系统运行状态、容量汇总与实时动态。
 2. [账号管理 (Accounts)](./accounts.md) - 139/Quark 账号的增删改查与校验。
 3. [任务管理 (Tasks)](./tasks.md) - 转存任务的生命周期管理与手动触发。
-4. [系统设置 (Settings)](./settings.md) - 全局调度规则与定时开关。
+4. [系统设置 (Settings)](./settings.md) - **[开发中]** 全局调度规则、通知推送与 AI 配置。
 5. [数据库设计 (Database Schema)](./database.md) - 核心数据表结构与字段说明。
 
 ## 全局响应格式
