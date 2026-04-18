@@ -1,52 +1,25 @@
-# 账号状态 UI 优化实施计划 (Account Status UI Optimization Plan)
+# 仪表盘 UI 对齐与样式统一计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+**目标：** 解决 Dashboard 页面左右卡片高度不一致、字体不统一的问题，并优化模块命名。
 
-**Goal:** 优化账号列表中的“状态”列展示效果，将原本不协调的 `el-badge`（带右上角小圆点）替换为“浅色胶囊标签 (Light Tag)”，使界面更加现代和柔和。
+**修改内容：**
 
-**Architecture:** 
-1. 在 `web/src/views/Accounts.vue` 中，将 `<el-badge>` 替换为 `<el-tag type="success|danger" effect="light" round class="status-tag">`。
-2. 将该列内容居中对齐，并增加一点自定义的内边距样式以显得更饱满。
+### 1. 模块命名优化
+- 将仪表盘右侧卡片标题从“任务执行监控”优化为“实时执行状态”。
 
-**Tech Stack:** Vue 3, Element Plus, CSS
+### 2. 布局对齐 (高度一致)
+- **CSS 调整**：为左右两个主卡片 (`terminal-card` 和 `monitor-card`) 增加统一的 `min-height: 500px`。
+- **滚动区域**：
+  - 左侧终端保持 `450px` 高度并滚动。
+  - 为右侧卡片内部增加一个 `monitor-scroll-area`，设置固定高度并支持 `overflow-y: auto`。
+- 效果：无论任务多少，左右两个白色大卡片的底边始终水平对齐。
 
----
+### 3. 字体风格统一
+- **等宽字体应用**：
+  - 在右侧监控卡片的 `task-name`、`stage-msg` 和 `activity-name` 中引入 `font-family: 'Fira Code', 'Courier New', monospace;`。
+  - 这种等宽字体会与左侧日志流形成视觉呼应，强化“实时监控”的专业感。
 
-### Task 1: 替换状态列模板
-
-**Files:**
-- Modify: `web/src/views/Accounts.vue`
-
-- [ ] **Step 1: 替换 HTML 模板**
-  找到“状态”列的 `<el-table-column>`，将其内容替换为圆角、浅色效果的 `el-tag`。
-
-  ```vue
-        <el-table-column label="状态" width="100" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.status === 1 ? 'success' : 'danger'" effect="light" round class="status-tag">
-              {{ row.status === 1 ? '正常' : '失效' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-  ```
-
-- [ ] **Step 2: 添加 CSS 样式**
-  在 `<style scoped>` 中为 `.status-tag` 添加稍微宽一点的内边距和加粗字体，以增强胶囊的质感。
-
-  ```css
-  .status-tag {
-    padding: 0 12px;
-    font-weight: 500;
-  }
-  ```
-
-### Task 2: 验证与提交
-
-- [ ] **Step 1: 验证展示效果**
-  重新启动或热更新前端项目，检查状态列是否变成了圆角的浅绿/浅红胶囊标签。
-
-- [ ] **Step 2: 提交代码**
-  ```bash
-  git add web/src/views/Accounts.vue
-  git commit -m "style(web): 优化账号状态列 UI 为浅色胶囊标签"
-  ```
+### 4. 细节美化
+- 缩小右侧进度条的 `stroke-width`（从 10 降到 8），使其看起来更精致。
+- 优化 `el-divider` 的间距。
+- 增加卡片的悬浮阴影效果。
