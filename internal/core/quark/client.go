@@ -209,8 +209,15 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 	data, ok := resRaw["data"].(map[string]interface{})
 	if !ok || data == nil {
 		msg, _ := resRaw["message"].(string)
-		log.Printf("[Quark] 获取基础信息失败: %v, %s", resRaw["code"], msg)
-		return nil, fmt.Errorf("Quark API error: %v, %s", resRaw["code"], msg)
+		code := fmt.Sprintf("%v", resRaw["code"])
+		log.Printf("[Quark] 获取基础信息失败: %s, %s", code, msg)
+		if code == "401" || code == "11002" {
+			return nil, fmt.Errorf("夸克网盘登录已失效，请重新获取 Cookie 并更新 (401 Unauthorized)")
+		}
+		if msg != "" {
+			return nil, fmt.Errorf("Quark API error [%s]: %s", code, msg)
+		}
+		return nil, fmt.Errorf("Quark API error [%s]: 获取基础信息失败，请检查 Cookie", code)
 	}
 
 	nickname, _ := data["nickname"].(string)

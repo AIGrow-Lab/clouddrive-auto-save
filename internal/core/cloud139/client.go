@@ -263,10 +263,25 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 	}
 
 	if code != "0000" && code != "0" && code != "" {
-		if code == "05050009" || code == "1010010003" {
-			return nil, fmt.Errorf("登录已失效 (Token Invalid)")
+		msg := ""
+		if m, ok := resRaw["message"].(string); ok && m != "" {
+			msg = m
+		} else if m, ok := resRaw["msg"].(string); ok && m != "" {
+			msg = m
+		} else if m, ok := resRaw["desc"].(string); ok && m != "" {
+			msg = m
 		}
-		return nil, fmt.Errorf("API error: %s", code)
+
+		if code == "01000004" {
+			return nil, fmt.Errorf("登录凭证无效或已过期 (AuthToken / Cookie 错误)")
+		}
+		if code == "05050009" || code == "1010010003" {
+			return nil, fmt.Errorf("登录已失效，请重新获取 Cookie (Token Invalid)")
+		}
+		if msg != "" {
+			return nil, fmt.Errorf("139 API error [%s]: %s", code, msg)
+		}
+		return nil, fmt.Errorf("139 API error [%s]: 云盘接口异常，请检查网络或配置", code)
 	}
 
 	data, _ := resRaw["data"].(map[string]interface{})
