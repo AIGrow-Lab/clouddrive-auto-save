@@ -6,7 +6,7 @@
     </div>
 
     <el-row :gutter="24" class="stat-cards">
-        <el-col :xs="24" :sm="12" :md="6">
+      <el-col :xs="24" :sm="12" :md="6">
         <el-card class="stat-card" body-style="padding: 20px">
           <div class="stat-icon purple">
             <Activity :size="24" />
@@ -58,7 +58,7 @@
     <el-row :gutter="24" class="content-row">
       <!-- 左侧：实时日志终端 -->
       <el-col :xs="24" :lg="16">
-        <el-card class="terminal-card" body-style="padding: 0">
+        <el-card class="dashboard-main-card terminal-card" body-style="padding: 0">
           <template #header>
             <div class="card-header">
               <div class="header-title">
@@ -84,61 +84,68 @@
         </el-card>
       </el-col>
 
-      <!-- 右侧：当前任务监控 -->
+      <!-- 右侧：实时任务监控 -->
       <el-col :xs="24" :lg="8">
-        <el-card class="monitor-card">
+        <el-card class="dashboard-main-card monitor-card">
           <template #header>
             <div class="card-header">
-              <span>任务执行监控</span>
-              <el-tag size="small" type="info">{{ runningTasks.length }} 运行中</el-tag>
+              <div class="header-title">
+                <el-icon><Activity /></el-icon>
+                <span>实时执行状态</span>
+              </div>
+              <el-tag size="small" type="primary" effect="light">{{ runningTasks.length }} 活跃</el-tag>
             </div>
           </template>
           
-          <div class="running-tasks-list">
-            <div v-for="task in runningTasks" :key="task.id" class="task-progress-card">
-              <div class="task-info">
-                <span class="task-name">{{ task.name }}</span>
-                <div class="task-actions">
-                  <el-icon v-if="task.percent < 100" class="is-loading"><Loader2 /></el-icon>
-                  <el-icon v-else-if="task.stage === 'Success'" color="#67c23a"><CheckCircle2 /></el-icon>
-                  <el-icon v-else-if="task.stage === 'Failed'" color="#f56c6c"><AlertCircle /></el-icon>
-                  <el-button v-if="task.percent === 100" type="info" link @click="dismissTask(task.id)" style="margin-left: 8px; padding: 0">
-                    <el-icon><X /></el-icon>
-                  </el-button>
+          <div class="monitor-scroll-area">
+            <!-- 仅当有活跃任务时显示该区域 -->
+            <div v-if="runningTasks.length > 0" class="running-tasks-list">
+              <div v-for="task in runningTasks" :key="task.id" class="task-progress-card">
+                <div class="task-info">
+                  <span class="task-name">{{ task.name }}</span>
+                  <div class="task-actions">
+                    <el-icon v-if="task.percent < 100" class="is-loading"><Loader2 /></el-icon>
+                    <el-icon v-else-if="task.stage === 'Success'" color="#67c23a"><CheckCircle2 /></el-icon>
+                    <el-icon v-else-if="task.stage === 'Failed'" color="#f56c6c"><AlertCircle /></el-icon>
+                    <el-button v-if="task.percent === 100" type="info" link @click="dismissTask(task.id)" style="margin-left: 8px; padding: 0">
+                      <el-icon><X /></el-icon>
+                    </el-button>
+                  </div>
                 </div>
+                <div class="task-stage">
+                  <el-tag size="small" :type="getStageTagType(task.stage)" effect="dark">{{ task.stage }}</el-tag>
+                  <span class="stage-msg">{{ task.message }}</span>
+                </div>
+                <el-progress 
+                  :percentage="task.percent" 
+                  :status="task.stage === 'Failed' ? 'exception' : (task.percent === 100 ? 'success' : '')"
+                  :stroke-width="8"
+                  striped
+                  :striped-flow="task.percent < 100"
+                />
               </div>
-              <div class="task-stage">
-                <el-tag size="small" :type="getStageTagType(task.stage)" effect="dark">{{ task.stage }}</el-tag>
-                <span class="stage-msg">{{ task.message }}</span>
-              </div>
-              <el-progress 
-                :percentage="task.percent" 
-                :status="task.stage === 'Failed' ? 'exception' : (task.percent === 100 ? 'success' : '')"
-                :stroke-width="10"
-                striped
-                :striped-flow="task.percent < 100"
-              />
+              <el-divider>近期动态</el-divider>
             </div>
 
-            <div v-if="runningTasks.length === 0" class="monitor-empty">
-              <el-empty :image-size="60" description="当前无运行中的任务" />
+            <!-- 如果没有活跃任务，这里将置顶 -->
+            <el-timeline class="compact-timeline">
+              <el-timeline-item 
+                v-for="activity in stats.recent_activities" 
+                :key="activity.id"
+                :timestamp="formatRelativeTime(activity.last_run)" 
+                :type="getStatusType(activity.status)"
+              >
+                <div class="timeline-content">
+                  <span class="activity-name">{{ activity.name }}</span>
+                  <el-button v-if="activity.status === 'failed'" size="small" link type="primary" @click="handleRetry(activity.id)">重试</el-button>
+                </div>
+              </el-timeline-item>
+            </el-timeline>
+            
+            <div v-if="runningTasks.length === 0 && stats.recent_activities.length === 0" class="monitor-empty">
+              <el-empty :image-size="40" description="暂无活动记录" />
             </div>
           </div>
-
-          <el-divider>近期动态</el-divider>
-          <el-timeline class="compact-timeline">
-            <el-timeline-item 
-              v-for="activity in stats.recent_activities" 
-              :key="activity.id"
-              :timestamp="formatRelativeTime(activity.last_run)" 
-              :type="getStatusType(activity.status)"
-            >
-              <div class="timeline-content">
-                <span>{{ activity.name }}</span>
-                <el-button v-if="activity.status === 'failed'" size="small" link type="primary" @click="handleRetry(activity.id)">重试</el-button>
-              </div>
-            </el-timeline-item>
-          </el-timeline>
         </el-card>
       </el-col>
     </el-row>
@@ -170,7 +177,7 @@ import {
   User,
   Terminal,
   Trash2,
-  Play,
+  Plus,
   CheckCircle2,
   AlertCircle,
   Loader2,
@@ -220,7 +227,8 @@ const fetchStats = async (isPoll = false) => {
           name: task.name,
           percent: task.percent,
           stage: task.stage,
-          message: task.message
+          message: task.message,
+          timeoutId: null
         })
       }
     })
@@ -326,7 +334,8 @@ const handleProgressMessage = (msg) => {
       name: `任务 #${taskId}`, 
       percent, 
       stage, 
-      message: info 
+      message: info,
+      timeoutId: null
     })
     fetchStats()
   }
@@ -488,19 +497,37 @@ html.dark .stat-value { color: #f1f5f9; }
   margin-top: 24px;
 }
 
-.placeholder-chart {
-  height: 240px;
+.dashboard-main-card {
+  height: 520px;
   display: flex;
-  align-items: flex-end;
-  justify-content: space-around;
-  padding: 20px;
+  flex-direction: column;
+  transition: all 0.3s;
 }
 
-.chart-bar {
-  width: 40px;
-  background: var(--el-color-primary);
-  border-radius: 8px 8px 0 0;
-  opacity: 0.6;
+.dashboard-main-card:hover {
+  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.15);
+}
+
+.dashboard-main-card :deep(.el-card__body) {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.monitor-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+/* 自定义滚动条样式 */
+.monitor-scroll-area::-webkit-scrollbar {
+  width: 5px;
+}
+.monitor-scroll-area::-webkit-scrollbar-thumb {
+  background: var(--el-border-color-lighter);
+  border-radius: 10px;
 }
 
 .card-header {
@@ -518,7 +545,7 @@ html.dark .stat-value { color: #f1f5f9; }
 
 /* 日志终端样式 */
 .terminal-window {
-  height: 450px;
+  flex: 1;
   background-color: #0f172a;
   color: #e2e8f0;
   padding: 16px;
@@ -578,6 +605,7 @@ html.dark .stat-value { color: #f1f5f9; }
 .task-name {
   font-weight: 600;
   font-size: 14px;
+  font-family: 'Fira Code', 'Courier New', monospace;
 }
 
 .task-stage {
@@ -593,6 +621,7 @@ html.dark .stat-value { color: #f1f5f9; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-family: 'Fira Code', 'Courier New', monospace;
 }
 
 .monitor-empty {
@@ -610,7 +639,12 @@ html.dark .stat-value { color: #f1f5f9; }
   align-items: center;
 }
 
-/* 悬浮操作栏 */
+.activity-name {
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-size: 13px;
+}
+
+/* 浮动快捷操作 */
 .fab-container {
   position: fixed;
   right: 40px;
