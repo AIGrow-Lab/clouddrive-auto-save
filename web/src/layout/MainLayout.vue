@@ -24,10 +24,6 @@
           <el-icon><ListChecks :size="20" /></el-icon>
           <span>任务列表</span>
         </el-menu-item>
-        <el-menu-item index="/settings">
-          <el-icon><Settings :size="20" /></el-icon>
-          <span>系统设置</span>
-        </el-menu-item>
       </el-menu>
     </el-aside>
 
@@ -72,7 +68,6 @@ import {
   LayoutDashboard, 
   User, 
   ListChecks, 
-  Settings, 
   Moon, 
   Sun 
 } from 'lucide-vue-next'
@@ -86,8 +81,7 @@ const currentPageTitle = computed(() => {
   const titles = {
     '/': '仪表盘',
     '/accounts': '账号管理',
-    '/tasks': '任务管理',
-    '/settings': '系统设置'
+    '/tasks': '任务管理'
   }
   return titles[route.path] || '概览'
 })
