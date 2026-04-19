@@ -36,8 +36,9 @@
 
 ## 🏗️ 技术架构 (Architecture)
 
-*   **Backend**: Go 1.23, Gin (Web Framework), GORM (ORM), SQLite3 (Database).
+*   **Backend**: Go 1.25, Gin (Web Framework), GORM (ORM), SQLite3 (Database).
 *   **Frontend**: Vue 3, Vite, Element Plus, Lucide Icons.
+*   **Logging**: 结构化分级日志 (`log/slog`)，支持实时仪表盘同步。
 *   **Scheduler**: 基于 `robfig/cron/v3` 的高性能调度引擎。
 
 ---
@@ -55,6 +56,30 @@ docker-compose up -d --build
 1.  **构建前端**：`cd web && npm install && npm run build`
 2.  **编译后端**：`go build -o ucas cmd/server/main.go`
 3.  **运行**：`./ucas`
+
+---
+
+## ⚙️ 配置说明 (Configuration)
+
+系统支持通过环境变量进行微调：
+
+| 变量 | 说明 | 默认值 |
+| :--- | :--- | :--- |
+| `LOG_LEVEL` | 日志等级 (`DEBUG`, `INFO`, `WARN`, `ERROR`) | `INFO` |
+| `DB_PATH` | SQLite 数据库文件路径 | `data.db` |
+
+> **提示**：在生产环境下，建议保持 `LOG_LEVEL=INFO` 以获得最清爽的运行体验；若需排查网盘接口的具体 JSON 响应，请切换至 `DEBUG`。
+
+---
+
+## 🛠️ 开发与维护
+
+本项目内置了完善的 Makefile 工具链，方便开发者进行质量管控：
+
+*   **`make test`**：运行单元测试（含并发竞态检测与覆盖率统计）。
+*   **`make check`**：一键执行 `fmt`、`vet` 和 `test` 的全量验证。
+*   **`make lint`**：检查代码格式规范。
+*   **`make test-html`**：在浏览器中打开可视化的代码覆盖率报告。
 
 ---
 
