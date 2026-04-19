@@ -13,7 +13,7 @@ import (
 var MagicVariables = map[string]string{
 	"{YEAR}":    `\b(?:18|19|20)\d{2}\b`,
 	"{DATE}":    `\b(?:18|19|20)?\d{2}[\.\-/年]\d{1,2}[\.\-/月]\d{1,2}\b`,
-	"{CHINESE}": `[\u4e00-\u9fa5]{2,}`,
+	"{CHINESE}": `\p{Han}{2,}`,
 	"{EXT}":     `\.(\w+)$`, // 使用捕获组提取后缀
 }
 
