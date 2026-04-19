@@ -2,8 +2,8 @@ package core
 
 import (
 	"context"
-	"time"
 	"github.com/zcq/clouddrive-auto-save/internal/db"
+	"time"
 )
 
 // FileInfo 代表云盘中的文件或文件夹信息
@@ -25,12 +25,12 @@ type CloudDrive interface {
 	// 账号相关
 	GetInfo(ctx context.Context) (*db.Account, error)
 	Login(ctx context.Context) error
-	
+
 	// 文件操作
 	ListFiles(ctx context.Context, parentID string) ([]FileInfo, error)
 	CreateFolder(ctx context.Context, parentID, name string) (*FileInfo, error)
 	DeleteFile(ctx context.Context, fileID string) error
-	
+
 	// 分享转存相关
 	// ParseShare 解析分享链接，返回其中的文件列表
 	ParseShare(ctx context.Context, shareURL, extractCode string) ([]FileInfo, error)

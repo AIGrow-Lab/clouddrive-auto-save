@@ -20,11 +20,11 @@ type Job struct {
 
 // Manager 负责管理 Worker 池和任务分发
 type Manager struct {
-	workers    int
-	jobQueue   chan Job
-	wg         sync.WaitGroup
-	ctx        context.Context
-	cancel     context.CancelFunc
+	workers  int
+	jobQueue chan Job
+	wg       sync.WaitGroup
+	ctx      context.Context
+	cancel   context.CancelFunc
 }
 
 func NewManager(numWorkers int) *Manager {
