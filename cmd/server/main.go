@@ -1,9 +1,9 @@
 package main
 
 import (
-	"io"
-	"log"
+	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/zcq/clouddrive-auto-save/internal/api"
 	"github.com/zcq/clouddrive-auto-save/internal/core/scheduler"
@@ -12,26 +12,30 @@ import (
 	"github.com/zcq/clouddrive-auto-save/internal/utils"
 )
 
-type BroadcasterWriter struct{}
-
-func (w *BroadcasterWriter) Write(p []byte) (n int, err error) {
-	utils.GlobalBroadcaster.Broadcast(string(p))
-	return len(p), nil
-}
-
 func main() {
-	// 0. 劫持日志输出，镜像到广播器
-	log.SetOutput(io.MultiWriter(os.Stdout, &BroadcasterWriter{}))
+	// 0. 初始化日志系统
+	logLevelStr := strings.ToUpper(os.Getenv("LOG_LEVEL"))
+	minLevel := slog.LevelInfo
+	switch logLevelStr {
+	case "DEBUG":
+		minLevel = slog.LevelDebug
+	case "WARN":
+		minLevel = slog.LevelWarn
+	case "ERROR":
+		minLevel = slog.LevelError
+	}
+	utils.InitLogger(minLevel, os.Stdout)
+	slog.Info("Logging system initialized", "level", minLevel.String())
 
 	// 1. 初始化数据库
-
 	dbPath := os.Getenv("DB_PATH")
 	if dbPath == "" {
 		dbPath = "data.db"
 	}
-	log.Printf("Initializing database at %s...", dbPath)
+	slog.Info("Initializing database...", "path", dbPath)
 	if err := db.InitDB(dbPath); err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
+		slog.Error("Failed to initialize database", "error", err)
+		os.Exit(1)
 	}
 
 	// 1.5 清理异常中断的任务（重置卡在 running 状态的任务）
@@ -41,7 +45,7 @@ func main() {
 	})
 
 	// 2. 启动任务管理器 (并发数为 3)
-	log.Println("Starting worker manager...")
+	slog.Info("Starting worker manager...", "workers", 3)
 	wm := worker.NewManager(3, db.DB)
 	wm.Start()
 	defer wm.Stop()
@@ -66,9 +70,10 @@ func main() {
 	}
 
 	// 3. 启动 API 服务
-	log.Println("Starting API server on 127.0.0.1:8080...")
+	slog.Info("Starting API server on 127.0.0.1:8080...")
 	r := api.InitRouter(wm)
 	if err := r.Run("127.0.0.1:8080"); err != nil {
-		log.Fatalf("Failed to start API server: %v", err)
+		slog.Error("Failed to start API server", "error", err)
+		os.Exit(1)
 	}
 }

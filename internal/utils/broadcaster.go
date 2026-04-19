@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"strings"
 	"sync"
 )
 
@@ -47,12 +48,14 @@ func (b *Broadcaster) run() {
 			b.mu.Unlock()
 		case message := <-b.messages:
 			b.mu.Lock()
-			// 更新历史记录
-			b.history = append(b.history, message)
-			if len(b.history) > 50 {
-				b.history = b.history[1:]
+			// 更新历史记录 (过滤掉纯数据事件，只保留文本日志)
+			if !strings.HasPrefix(message, "[EVENT:") {
+				b.history = append(b.history, message)
+				if len(b.history) > 50 {
+					b.history = b.history[1:]
+				}
 			}
-			// 广播给所有在线客户端
+			// 广播给所有在线客户端 (无论是否是事件都要发，保证实时性)
 			for client := range b.clients {
 				select {
 				case client <- message:
