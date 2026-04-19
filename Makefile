@@ -48,19 +48,54 @@ build-server: build-web
 build: build-server
 
 # ------------------------------------------
-# 测试与清理 (Test & Clean)
+# 测试与质量检查 (Test & Quality Check)
 # ------------------------------------------
 
-## test: 运行 Go 单元测试
-test:
-	@echo "=> Running tests..."
-	go test -v ./...
+## lint: 检查代码格式 (go fmt)
+lint:
+	@echo "=> Checking code format..."
+	@if [ -n "$$(gofmt -l .)" ]; then \
+		echo "The following files are not formatted:"; \
+		gofmt -l .; \
+		exit 1; \
+	fi
+	@echo "=> Code format check passed."
 
-## clean: 清理构建产物 (二进制文件和前端 dist 目录)
+## vet: 静态分析检查 (go vet)
+vet:
+	@echo "=> Running go vet..."
+	go vet ./...
+
+## test: 运行 Go 单元测试 (含竞态检测和覆盖率)
+test:
+	@echo "=> Running tests with race detection..."
+	go test -v -race ./...
+	@echo ""
+	@echo "=> Collecting coverage info for packages with tests..."
+	@PACKAGES=$$(go list -f '{{if .TestGoFiles}}{{.ImportPath}}{{end}}' ./...); \
+	if [ -n "$$PACKAGES" ]; then \
+		go test -coverprofile=coverage.out $$PACKAGES > /dev/null; \
+		echo "=> Coverage Summary:"; \
+		go tool cover -func=coverage.out | tail -n 1; \
+	else \
+		echo "=> No test files found, skipping coverage collection."; \
+	fi
+
+## test-html: 在浏览器中查看覆盖率报告
+test-html: test
+	@echo "=> Generating and opening coverage report..."
+	go tool cover -html=coverage.out
+
+## check: 运行 lint, vet 和 test (完整验证流程)
+check: lint vet test
+	@echo "=> All checks passed successfully!"
+
+## clean: 清理构建产物 (二进制文件、覆盖率报告和前端 dist 目录)
 clean:
 	@echo "=> Cleaning build artifacts..."
 	rm -rf $(BIN_DIR)
 	rm -rf $(WEB_DIR)/dist
+	rm -f coverage.out
 	@echo "=> Clean finished."
 
 # ------------------------------------------
