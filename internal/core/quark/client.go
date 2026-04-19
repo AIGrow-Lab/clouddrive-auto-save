@@ -176,7 +176,7 @@ func (q *Quark) doRequest(ctx context.Context, method, apiURL string, query url.
 		apiPath = u.Path
 	}
 	msg := fmt.Sprintf("[Quark Debug] 接口 %s 响应: %s", apiPath, string(respBody))
-	log.Printf(msg)
+	log.Print(msg)
 
 	return respBody, nil
 }

@@ -215,7 +215,7 @@ func (c *Cloud139) doRequest(ctx context.Context, method, apiURL string, body in
 		apiPath = u.Path
 	}
 	msg := fmt.Sprintf("[139 Debug] 接口 %s 响应: %s", apiPath, string(respBody))
-	log.Printf(msg)
+	log.Print(msg)
 
 	return respBody, nil
 }
@@ -457,7 +457,7 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 
 	if userDomainID != "" {
 		diskReq := map[string]interface{}{"userDomainId": userDomainID}
-		
+
 		var totalCapacity, usedCapacity int64
 
 		// 1. 获取个人空间
@@ -919,14 +919,14 @@ func (c *Cloud139) getShareInfo(ctx context.Context, linkID, passwd, pCaID strin
 		codeStr := fmt.Sprintf("%v", code)
 		if codeStr != "0" && codeStr != "0000" && codeStr != "" {
 			log.Printf("[139] 接口返回错误码: %s, message: %v", codeStr, res["message"])
-			
+
 			// 139 错误码映射表
 			errorMap := map[string]string{
 				"200000727": "分享链接不存在或已被取消。",
 				"200000728": "提取码错误，请检查后再试。",
 				"200000732": "该分享链接已超过有效期。",
 			}
-			
+
 			if friendlyMsg, ok := errorMap[codeStr]; ok {
 				return nil, fmt.Errorf("[Fatal] %s", friendlyMsg)
 			}
