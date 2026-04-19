@@ -8,7 +8,7 @@ WEB_DIR = web
 GO_BUILD_FLAGS = -v
 
 # 版本信息
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "v1.0.0")
+VERSION ?= $(shell cat VERSION 2>/dev/null || echo "1.0.0")
 COMMIT_HASH = $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE = $(shell date +%FT%T%z)
 LDFLAGS = -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT_HASH) -X main.date=$(BUILD_DATE)
