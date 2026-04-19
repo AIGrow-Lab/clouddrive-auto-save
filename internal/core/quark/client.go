@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -138,7 +138,7 @@ func (q *Quark) doRequest(ctx context.Context, method, apiURL string, query url.
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("[Quark Debug] 请求异常: %s %s, StatusCode=%d, Body=%s", method, fullURL, resp.StatusCode, string(respBody))
+		slog.Error("Quark 请求异常", "method", method, "url", fullURL, "status", resp.StatusCode, "body", string(respBody))
 
 		var errResp map[string]interface{}
 		errMsg := fmt.Sprintf("HTTP 错误 %d", resp.StatusCode)
@@ -175,8 +175,7 @@ func (q *Quark) doRequest(ctx context.Context, method, apiURL string, query url.
 	if u != nil {
 		apiPath = u.Path
 	}
-	msg := fmt.Sprintf("[Quark Debug] 接口 %s 响应: %s", apiPath, string(respBody))
-	log.Print(msg)
+	slog.Debug("Quark API 响应", "path", apiPath, "body", string(respBody))
 
 	return respBody, nil
 }
@@ -184,7 +183,7 @@ func (q *Quark) doRequest(ctx context.Context, method, apiURL string, query url.
 // ─── CloudDrive 接口实现 ───────────────────────────────────────────────────────
 
 func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
-	log.Printf("[Quark] 正在获取账号信息...")
+	slog.Info("正在获取夸克账号信息")
 	// 预校验 Cookie 格式：PC 网页端接口强制要求包含 __uid
 	if !strings.Contains(q.account.Cookie, "__uid=") {
 		return nil, fmt.Errorf("夸克网盘 Cookie 格式不正确，缺少核心参数 __uid（请确保获取的是全量网页端 Cookie）")
@@ -197,7 +196,7 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 
 	resp, err := q.doRequest(ctx, "GET", apiURL, query, nil, false)
 	if err != nil {
-		log.Printf("[Quark] 获取账号信息请求失败: %v", err)
+		slog.Error("获取夸克账号信息请求失败", "error", err)
 		return nil, err
 	}
 
@@ -210,7 +209,7 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 	if !ok || data == nil {
 		msg, _ := resRaw["message"].(string)
 		code := fmt.Sprintf("%v", resRaw["code"])
-		log.Printf("[Quark] 获取基础信息失败: %s, %s", code, msg)
+		slog.Error("获取夸克基础信息失败", "code", code, "message", msg)
 		if code == "401" || code == "11002" {
 			return nil, fmt.Errorf("夸克网盘登录已失效，请重新获取 Cookie 并更新 (401 Unauthorized)")
 		}
@@ -235,12 +234,12 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 		q.account.AccountName = nickname
 	}
 
-	log.Printf("[Quark] 基础信息获取成功: %s", nickname)
+	slog.Info("夸克基础信息获取成功", "nickname", nickname)
 
 	// 2. 获取容量和 VIP 信息
 	vipFetched := false
 	if q.mparam["kps"] != "" {
-		log.Printf("[Quark] 发现 kps 参数，尝试调用 App 接口获取容量与会员状态")
+		slog.Info("发现 kps 参数，尝试调用 App 接口获取容量与会员状态")
 		queryGrowth := url.Values{}
 		growthResp, err := q.doRequest(ctx, "GET", BaseURLApp+"/1/clouddrive/capacity/growth/info", queryGrowth, nil, true)
 		if err == nil && len(growthResp) > 0 {
@@ -265,14 +264,17 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 				} else if growthRes.Data.MemberType != "" {
 					q.account.VipName = growthRes.Data.MemberType
 				}
-				log.Printf("[Quark] 容量信息 (App): Total=%.2fGB, Used=%.2fGB, MemberType=%s", float64(q.account.CapacityTotal)/1024/1024/1024, float64(q.account.CapacityUsed)/1024/1024/1024, q.account.VipName)
+				slog.Info("夸克容量信息 (App)",
+					"total_gb", float64(q.account.CapacityTotal)/1024/1024/1024,
+					"used_gb", float64(q.account.CapacityUsed)/1024/1024/1024,
+					"vip", q.account.VipName)
 				vipFetched = true
 			}
 		}
 	}
 
 	if !vipFetched {
-		log.Printf("[Quark] 尝试调用 Web 探测接口获取容量信息")
+		slog.Info("尝试调用 Web 探测接口获取容量信息")
 		apiURLs := []string{
 			"https://pan.quark.cn/1/clouddrive/member?pr=ucpro&fr=pc",
 			"https://drive-pc.quark.cn/1/clouddrive/capacity?pr=ucpro&fr=pc",
@@ -351,7 +353,9 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 				}
 
 				if vipFetched {
-					log.Printf("[Quark] 容量信息 (Web): Total=%.2fGB, Used=%.2fGB", total/1024/1024/1024, used/1024/1024/1024)
+					slog.Info("夸克容量信息 (Web)",
+						"total_gb", total/1024/1024/1024,
+						"used_gb", used/1024/1024/1024)
 					break
 				}
 			}
@@ -370,7 +374,7 @@ func (q *Quark) ListFiles(ctx context.Context, parentID string) ([]core.FileInfo
 	if parentID == "" || parentID == "/" {
 		parentID = "0"
 	}
-	log.Printf("[Quark] 正在列出目录文件: FID=%s", parentID)
+	slog.Info("正在列出夸克目录文件", "fid", parentID)
 
 	var allFiles []core.FileInfo
 	page := 1
@@ -389,7 +393,7 @@ func (q *Quark) ListFiles(ctx context.Context, parentID string) ([]core.FileInfo
 
 		resp, err := q.doRequest(ctx, "GET", apiURL, query, nil, false)
 		if err != nil {
-			log.Printf("[Quark] 列出目录请求失败: %v", err)
+			slog.Error("列出夸克目录请求失败", "error", err)
 			return nil, err
 		}
 
@@ -434,7 +438,7 @@ func (q *Quark) ListFiles(ctx context.Context, parentID string) ([]core.FileInfo
 		page++
 	}
 
-	log.Printf("[Quark] 目录列出完成: FID=%s, 发现 %d 个项", parentID, len(allFiles))
+	slog.Info("夸克目录列出完成", "fid", parentID, "count", len(allFiles))
 	return allFiles, nil
 }
 
@@ -442,7 +446,7 @@ func (q *Quark) CreateFolder(ctx context.Context, parentID, name string) (*core.
 	if parentID == "" || parentID == "/" {
 		parentID = "0"
 	}
-	log.Printf("[Quark] 正在创建文件夹: Name=%s, ParentFID=%s", name, parentID)
+	slog.Info("正在创建夸克文件夹", "name", name, "parent_fid", parentID)
 	apiURL := BaseURL + "/1/clouddrive/file"
 	query := url.Values{}
 	query.Set("pr", "ucpro")
@@ -456,7 +460,7 @@ func (q *Quark) CreateFolder(ctx context.Context, parentID, name string) (*core.
 	jsonBody, _ := json.Marshal(body)
 	resp, err := q.doRequest(ctx, "POST", apiURL, query, strings.NewReader(string(jsonBody)), false)
 	if err != nil {
-		log.Printf("[Quark] 创建文件夹请求失败: %v", err)
+		slog.Error("创建夸克文件夹请求失败", "error", err)
 		return nil, err
 	}
 
@@ -472,10 +476,10 @@ func (q *Quark) CreateFolder(ctx context.Context, parentID, name string) (*core.
 
 	codeStr := fmt.Sprintf("%v", res.Code)
 	if codeStr != "0" && codeStr != "0.0" {
-		log.Printf("[Quark] 创建文件夹接口返回错误: %v", res.Code)
+		slog.Error("创建夸克文件夹接口返回错误", "code", res.Code)
 		return nil, fmt.Errorf("Quark API error: %v", res.Code)
 	}
-	log.Printf("[Quark] 文件夹创建成功: %s (FID: %s)", name, res.Data.Fid)
+	slog.Info("夸克文件夹创建成功", "name", name, "fid", res.Data.Fid)
 	return &core.FileInfo{
 		ID:       res.Data.Fid,
 		Name:     name,
@@ -485,7 +489,7 @@ func (q *Quark) CreateFolder(ctx context.Context, parentID, name string) (*core.
 }
 
 func (q *Quark) DeleteFile(ctx context.Context, fileID string) error {
-	log.Printf("[Quark] 正在删除文件: FID=%s", fileID)
+	slog.Info("正在删除夸克文件", "fid", fileID)
 	apiURL := BaseURL + "/1/clouddrive/file/delete"
 	body := map[string]interface{}{
 		"action_type":  2,
@@ -519,7 +523,7 @@ func (q *Quark) getStoken(ctx context.Context, pwdID, extractCode string) (strin
 	}
 	codeStr := fmt.Sprintf("%v", tokenRes.Code)
 	if codeStr != "0" && codeStr != "0.0" {
-		log.Printf("[Quark] 获取 Stoken 失败: %v", tokenRes.Code)
+		slog.Error("获取夸克 Stoken 失败", "code", tokenRes.Code)
 		return "", fmt.Errorf("Quark token error: %v", tokenRes.Code)
 	}
 	return tokenRes.Data.Stoken, nil
@@ -546,11 +550,11 @@ func (q *Quark) ParseShare(ctx context.Context, shareURL, extractCode string) ([
 		return nil, fmt.Errorf("invalid quark share url: %s", shareURL)
 	}
 
-	log.Printf("[Quark] 正在解析分享链接: pwdID=%s, pdirFID=%s", pwdID, pdirFID)
+	slog.Info("正在解析夸克分享链接", "pwd_id", pwdID, "pdir_fid", pdirFID)
 
 	stoken, err := q.getStoken(ctx, pwdID, extractCode)
 	if err != nil {
-		log.Printf("[Quark] 解析分享链接失败 (Stoken获取失败): %v", err)
+		slog.Error("解析夸克分享链接失败 (Stoken获取失败)", "error", err)
 		return nil, err
 	}
 
@@ -568,7 +572,7 @@ func (q *Quark) ParseShare(ctx context.Context, shareURL, extractCode string) ([
 	detailQuery.Set("_sort", "file_type:asc,updated_at:desc")
 	resp, err := q.doRequest(ctx, "GET", detailURL, detailQuery, nil, true)
 	if err != nil {
-		log.Printf("[Quark] 解析分享链接失败 (详情请求失败): %v", err)
+		slog.Error("解析夸克分享链接失败 (详情请求失败)", "error", err)
 		return nil, err
 	}
 
@@ -600,7 +604,7 @@ func (q *Quark) ParseShare(ctx context.Context, shareURL, extractCode string) ([
 			UpdateTime: updateTime,
 		})
 	}
-	log.Printf("[Quark] 解析分享完成: 发现 %d 个项", len(files))
+	slog.Info("夸克解析分享完成", "count", len(files))
 	return files, nil
 }
 
@@ -645,11 +649,11 @@ func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath 
 		return fmt.Errorf("invalid quark share url: %s", shareURL)
 	}
 
-	log.Printf("[Quark] 正在提交转存任务: pwdID=%s, targetPath=%s", pwdID, targetPath)
+	slog.Info("正在提交夸克转存任务", "pwd_id", pwdID, "target_path", targetPath)
 
 	stoken, err := q.getStoken(ctx, pwdID, extractCode)
 	if err != nil {
-		log.Printf("[Quark] 转存失败 (Stoken获取失败): %v", err)
+		slog.Error("夸克转存失败 (Stoken获取失败)", "error", err)
 		return err
 	}
 
@@ -678,7 +682,7 @@ func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath 
 
 	targetID, err := q.PrepareTargetPath(ctx, targetPath)
 	if err != nil {
-		log.Printf("[Quark] 转存失败 (准备目标路径失败): %v", err)
+		slog.Error("夸克转存失败 (准备目标路径失败)", "error", err)
 		return err
 	}
 
@@ -698,7 +702,7 @@ func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath 
 	}
 
 	if len(fids) == 0 {
-		log.Printf("[Quark] 转存取消: 未发现匹配的文件 FID")
+		slog.Info("夸克转存取消: 未发现匹配的文件 FID")
 		return nil
 	}
 
@@ -710,10 +714,10 @@ func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath 
 	jsonSave, _ := json.Marshal(saveBody)
 	_, err = q.doRequest(ctx, "POST", saveURL, nil, strings.NewReader(string(jsonSave)), true)
 	if err != nil {
-		log.Printf("[Quark] 转存执行异常: %v", err)
+		slog.Error("夸克转存执行异常", "error", err)
 		return err
 	}
-	log.Printf("[Quark] 转存成功: 已保存 %d 个项至 FID=%s", len(fids), targetID)
+	slog.Info("夸克转存成功", "count", len(fids), "target_fid", targetID)
 	return nil
 }
 

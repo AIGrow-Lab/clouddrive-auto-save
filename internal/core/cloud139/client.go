@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -205,6 +205,7 @@ func (c *Cloud139) doRequest(ctx context.Context, method, apiURL string, body in
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		slog.Error("139 请求异常", "method", method, "url", apiURL, "status", resp.StatusCode, "body", string(respBody))
 		return nil, fmt.Errorf("HTTP error: %d, body: %s", resp.StatusCode, string(respBody))
 	}
 
@@ -214,8 +215,7 @@ func (c *Cloud139) doRequest(ctx context.Context, method, apiURL string, body in
 	if u != nil {
 		apiPath = u.Path
 	}
-	msg := fmt.Sprintf("[139 Debug] 接口 %s 响应: %s", apiPath, string(respBody))
-	log.Print(msg)
+	slog.Debug("139 API 响应", "path", apiPath, "body", string(respBody))
 
 	return respBody, nil
 }
@@ -236,7 +236,7 @@ func (c *Cloud139) computeAnySign(body interface{}) string {
 }
 
 func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
-	log.Printf("[139] 正在获取账号信息...")
+	slog.Info("正在获取139账号信息")
 	headers := map[string]string{
 		"caller":         "web",
 		"x-m4c-caller":   "PC",
@@ -245,7 +245,7 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 	}
 	resp, err := c.doRequest(ctx, "POST", UserNjsURL+"/user/getUser", map[string]interface{}{}, headers)
 	if err != nil {
-		log.Printf("[139] 获取用户信息请求失败: %v", err)
+		slog.Error("获取139用户信息请求失败", "error", err)
 		return nil, err
 	}
 
@@ -384,7 +384,7 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 		c.account.AccountName = nickname
 	}
 
-	log.Printf("[139] 账号校验成功: %s (%s)", c.account.Nickname, c.account.AccountName)
+	slog.Info("139 账号校验成功", "nickname", c.account.Nickname, "account", c.account.AccountName)
 
 	// 1. 尝试从基础信息探测会员 (适配最新等级名称)
 	if val, ok := data["userServiceType"].(string); ok && val != "" {
@@ -444,11 +444,11 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 					foundLevel := bRes.Data.UserSubMemberList[0].MemberLvName
 					if foundLevel != "" {
 						c.account.VipName = foundLevel
-						log.Printf("[139] 成功通过权益接口更新会员等级: %s", c.account.VipName)
+						slog.Info("成功通过权益接口更新139会员等级", "vip", c.account.VipName)
 						break
 					}
 				} else {
-					log.Printf("[139] 权益接口未返回会员信息，默认为非会员")
+					slog.Info("139 权益接口未返回会员信息，默认为非会员")
 					c.account.VipName = "普通用户"
 				}
 			}
@@ -509,7 +509,7 @@ func (c *Cloud139) ListFiles(ctx context.Context, parentID string) ([]core.FileI
 	if parentID == "" {
 		parentID = "/"
 	}
-	log.Printf("[139] 正在列出目录文件: %s", parentID)
+	slog.Info("正在列出139目录文件", "parent_id", parentID)
 	sign := c.computeMcloudSign(parentID)
 	headers := map[string]string{
 		"mcloud-sign":            sign,
@@ -531,7 +531,7 @@ func (c *Cloud139) ListFiles(ctx context.Context, parentID string) ([]core.FileI
 
 	resp, err := c.doRequest(ctx, "POST", PersonalKdNjsURL+"/hcy/file/list", body, headers)
 	if err != nil {
-		log.Printf("[139] 列出目录请求失败: %v", err)
+		slog.Error("列出139目录请求失败", "error", err)
 		return nil, err
 	}
 
@@ -567,7 +567,7 @@ func (c *Cloud139) ListFiles(ctx context.Context, parentID string) ([]core.FileI
 			UpdateTime: updateTime,
 		})
 	}
-	log.Printf("[139] 目录列出完成: %s, 发现 %d 个项", parentID, len(files))
+	slog.Info("139 目录列出完成", "parent_id", parentID, "count", len(files))
 	return files, nil
 }
 
@@ -575,7 +575,7 @@ func (c *Cloud139) CreateFolder(ctx context.Context, parentID, name string) (*co
 	if parentID == "" {
 		parentID = "/"
 	}
-	log.Printf("[139] 正在创建文件夹: Name=%s, ParentID=%s", name, parentID)
+	slog.Info("正在创建139文件夹", "name", name, "parent_id", parentID)
 	sign := c.computeMcloudSign(parentID)
 	headers := map[string]string{
 		"mcloud-sign": sign,
@@ -587,7 +587,7 @@ func (c *Cloud139) CreateFolder(ctx context.Context, parentID, name string) (*co
 	}
 	resp, err := c.doRequest(ctx, "POST", PersonalKdNjsURL+"/hcy/file/create", body, headers)
 	if err != nil {
-		log.Printf("[139] 创建文件夹请求失败: %v", err)
+		slog.Error("创建139文件夹请求失败", "error", err)
 		return nil, err
 	}
 	var res struct {
@@ -612,7 +612,7 @@ func (c *Cloud139) CreateFolder(ctx context.Context, parentID, name string) (*co
 		finalID = res.Data.ID
 	}
 
-	log.Printf("[139] 文件夹创建成功: %s", name)
+	slog.Info("139 文件夹创建成功", "name", name, "id", finalID)
 	return &core.FileInfo{
 		ID:       finalID,
 		Name:     name,
@@ -893,7 +893,7 @@ func (c *Cloud139) parseShareLink(input string) (string, string, string, error) 
 }
 
 func (c *Cloud139) getShareInfo(ctx context.Context, linkID, passwd, pCaID string) (map[string]interface{}, error) {
-	log.Printf("[139] 正在获取分享信息: linkID=%s, pCaID=%s", linkID, pCaID)
+	slog.Info("正在获取139分享信息", "link_id", linkID, "p_ca_id", pCaID)
 	headers := map[string]string{
 		"caller": "web", "x-m4c-caller": "PC", "mcloud-client": "10701",
 		"mcloud-version": "7.17.2", "mcloud-channel": "1000101",
@@ -906,7 +906,7 @@ func (c *Cloud139) getShareInfo(ctx context.Context, linkID, passwd, pCaID strin
 	}
 	resp, err := c.doRequest(ctx, "POST", ShareKdNjsURL+"/yun-share/richlifeApp/devapp/IOutLink/getOutLinkInfoV6", body, headers)
 	if err != nil {
-		log.Printf("[139] 请求分享接口失败: %v", err)
+		slog.Error("请求139分享接口失败", "error", err)
 		return nil, err
 	}
 
@@ -918,7 +918,7 @@ func (c *Cloud139) getShareInfo(ctx context.Context, linkID, passwd, pCaID strin
 	if code, ok := res["code"]; ok {
 		codeStr := fmt.Sprintf("%v", code)
 		if codeStr != "0" && codeStr != "0000" && codeStr != "" {
-			log.Printf("[139] 接口返回错误码: %s, message: %v", codeStr, res["message"])
+			slog.Error("139 分享接口返回错误码", "code", codeStr, "message", res["message"])
 
 			// 139 错误码映射表
 			errorMap := map[string]string{
