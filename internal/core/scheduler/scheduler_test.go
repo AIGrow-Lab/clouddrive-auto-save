@@ -5,14 +5,11 @@ import (
 )
 
 func TestScheduler_AddAndRemoveTask(t *testing.T) {
-	s := New()
+	s := New(nil)
 	s.Start()
 	defer s.Stop()
 
-	err := s.UpdateTask(1, "custom", "0 * * * * *")
-	if err != nil {
-		t.Fatalf("Failed to add task: %v", err)
-	}
+	s.UpdateTask(1, "custom", "0 * * * * *")
 
 	if len(s.CustomEntryIDs) != 1 {
 		t.Errorf("Expected 1 task in scheduler, got %d", len(s.CustomEntryIDs))

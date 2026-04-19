@@ -1,7 +1,7 @@
 package scheduler
 
 import (
-	"log"
+	"log/slog"
 	"strings"
 	"sync"
 
@@ -14,146 +14,127 @@ type Scheduler struct {
 	cron           *cron.Cron
 	CustomEntryIDs map[uint]cron.EntryID
 	GlobalEntryID  cron.EntryID
-	mu             sync.RWMutex
+	wm             *worker.Manager
+	mu             sync.Mutex
 }
 
 var Global *Scheduler
-var workerManager *worker.Manager
 
 func Init(wm *worker.Manager) {
-	workerManager = wm
-	Global = New()
+	Global = New(wm)
 }
 
-func New() *Scheduler {
+func New(wm *worker.Manager) *Scheduler {
 	return &Scheduler{
-		cron:           cron.New(cron.WithSeconds()), // 支持秒级
+		cron:           cron.New(cron.WithSeconds()),
 		CustomEntryIDs: make(map[uint]cron.EntryID),
+		wm:             wm,
 	}
 }
 
 func (s *Scheduler) Start() {
 	s.cron.Start()
-	log.Println("[Scheduler] Started")
+	slog.Info("调度器已启动")
 }
 
 func (s *Scheduler) Stop() {
 	s.cron.Stop()
-	log.Println("[Scheduler] Stopped")
-}
-
-// ValidateCron 验证给定的 Cron 表达式是否有效
-func ValidateCron(cronExpr string) error {
-	if strings.TrimSpace(cronExpr) == "" {
-		return nil
-	}
-	tempCron := cron.New(cron.WithSeconds())
-	_, err := tempCron.AddFunc(cronExpr, func() {})
-	return err
+	slog.Info("调度器已停止")
 }
 
 func (s *Scheduler) RemoveTask(taskID uint) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if entryID, exists := s.CustomEntryIDs[taskID]; exists {
+
+	if entryID, ok := s.CustomEntryIDs[taskID]; ok {
 		s.cron.Remove(entryID)
 		delete(s.CustomEntryIDs, taskID)
-		log.Printf("[Scheduler] Removed custom schedule for task %d", taskID)
+		slog.Info("已移除任务自定义调度", "task_id", taskID)
 	}
 }
 
-// UpdateGlobalSchedule 更新全局调度规则
-func (s *Scheduler) UpdateGlobalSchedule(cronExpr string, enabled bool) error {
+func (s *Scheduler) UpdateGlobalSchedule(cronExpr string, enabled bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.GlobalEntryID != 0 {
 		s.cron.Remove(s.GlobalEntryID)
 		s.GlobalEntryID = 0
-		log.Println("[Scheduler] Removed old global schedule")
+		slog.Info("已移除旧的全局调度")
 	}
 
-	if !enabled || strings.TrimSpace(cronExpr) == "" {
-		return nil
-	}
+	if enabled && cronExpr != "" {
+		entryID, err := s.cron.AddFunc(cronExpr, func() {
+			slog.Info("触发全局调度任务")
+			var tasks []db.Task
+			if err := db.DB.Preload("Account").Where("schedule_mode = ?", "global").Find(&tasks).Error; err != nil {
+				slog.Error("全局调度：获取任务列表失败", "error", err)
+				return
+			}
 
-	entryID, err := s.cron.AddFunc(cronExpr, func() {
-		log.Println("[Scheduler] Triggering Global Schedule")
-		var tasks []db.Task
-		// 查出所有设置为 "跟随全局 (global)" 的任务
-		if err := db.DB.Preload("Account").Where("schedule_mode = ?", "global").Find(&tasks).Error; err != nil {
-			log.Printf("[Scheduler] Failed to fetch global tasks: %v", err)
+			for _, task := range tasks {
+				if task.Status == "running" {
+					slog.Info("全局调度：任务正在运行，跳过", "task_id", task.ID)
+					continue
+				}
+				if strings.Contains(task.Message, "[Fatal]") {
+					slog.Info("全局调度：任务存在致命错误，跳过", "task_id", task.ID)
+					continue
+				}
+
+				slog.Info("全局调度：正在触发任务", "task_id", task.ID)
+				s.wm.Submit(worker.Job{Task: &task})
+			}
+		})
+
+		if err != nil {
+			slog.Error("更新全局调度失败", "error", err)
 			return
 		}
-
-		for _, task := range tasks {
-			if task.Status == "running" {
-				log.Printf("[Scheduler] Task %d is already running, skipping", task.ID)
-				continue
-			}
-			if strings.Contains(task.Message, "[Fatal]") {
-				log.Printf("[Scheduler] Task %d has fatal error, skipping", task.ID)
-				continue
-			}
-
-			log.Printf("[Scheduler] Triggering task %d (Global Rule)", task.ID)
-			if workerManager != nil {
-				taskCopy := task // 避免闭包变量捕获问题
-				workerManager.Submit(worker.Job{Task: &taskCopy})
-			}
-		}
-	})
-
-	if err != nil {
-		log.Printf("[Scheduler] Failed to add global schedule: %v", err)
-		return err
+		s.GlobalEntryID = entryID
 	}
 
-	s.GlobalEntryID = entryID
-	log.Printf("[Scheduler] Global schedule updated: %s (enabled: %v)", cronExpr, enabled)
-	return nil
+	slog.Info("全局调度配置已更新", "cron", cronExpr, "enabled", enabled)
 }
 
-// UpdateTask 更新单个任务的自定义调度
-func (s *Scheduler) UpdateTask(taskID uint, mode string, customCron string) error {
+func (s *Scheduler) UpdateTask(taskID uint, mode string, customCron string) {
 	s.RemoveTask(taskID)
 
-	if mode != "custom" || strings.TrimSpace(customCron) == "" {
-		return nil
+	if mode == "custom" && customCron != "" {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+
+		entryID, err := s.cron.AddFunc(customCron, func() {
+			var task db.Task
+			if err := db.DB.Preload("Account").First(&task, taskID).Error; err != nil {
+				slog.Error("自定义调度：任务未找到，正在移除调度", "task_id", taskID)
+				s.RemoveTask(taskID)
+				return
+			}
+
+			if task.Status == "running" {
+				slog.Info("自定义调度：任务正在运行，跳过", "task_id", taskID)
+				return
+			}
+			if strings.Contains(task.Message, "[Fatal]") {
+				slog.Info("自定义调度：任务存在致命错误，跳过", "task_id", taskID)
+				return
+			}
+
+			slog.Info("自定义调度：正在触发任务", "task_id", taskID)
+			s.wm.Submit(worker.Job{Task: &task})
+		})
+
+		if err != nil {
+			slog.Error("更新任务自定义调度失败", "task_id", taskID, "error", err)
+			return
+		}
+		s.CustomEntryIDs[taskID] = entryID
+		slog.Info("已添加任务自定义调度", "task_id", taskID, "cron", customCron)
 	}
+}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	entryID, err := s.cron.AddFunc(customCron, func() {
-		var task db.Task
-		if err := db.DB.Preload("Account").First(&task, taskID).Error; err != nil {
-			log.Printf("[Scheduler] Task %d not found, removing from custom cron", taskID)
-			s.RemoveTask(taskID)
-			return
-		}
-
-		if task.Status == "running" {
-			log.Printf("[Scheduler] Task %d is already running, skipping", taskID)
-			return
-		}
-		if strings.Contains(task.Message, "[Fatal]") {
-			log.Printf("[Scheduler] Task %d has fatal error, skipping", taskID)
-			return
-		}
-
-		log.Printf("[Scheduler] Triggering task %d (Custom Rule)", taskID)
-		if workerManager != nil {
-			workerManager.Submit(worker.Job{Task: &task})
-		}
-	})
-
-	if err != nil {
-		log.Printf("[Scheduler] Failed to add custom task %d: %v", taskID, err)
-		return err
-	}
-
-	s.CustomEntryIDs[taskID] = entryID
-	log.Printf("[Scheduler] Added custom task %d with cron: %s", taskID, customCron)
-	return nil
+func ValidateCron(expr string) error {
+	_, err := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow).Parse(expr)
+	return err
 }
