@@ -16,16 +16,16 @@ all: help
 # 开发环境 (Development)
 # ------------------------------------------
 
-## dev-web: 启动 Vue 3 前端开发服务器 (运行在 5173 端口)
+## dev-web: 启动 Vue 3 前端开发服务器 (运行在 5173 端口, 开启 DEBUG 模式)
 dev-web:
-	@echo "=> Starting Vue 3 dev server..."
-	cd $(WEB_DIR) && npm run dev
+	@echo "=> Starting Vue 3 dev server (DEBUG mode)..."
+	cd $(WEB_DIR) && LOG_LEVEL=DEBUG npm run dev
 
-## dev-server: 启动 Go 后端开发服务器 (运行在 8080 端口)
+## dev-server: 启动 Go 后端开发服务器 (运行在 8080 端口, 开启 DEBUG 日志)
 dev-server:
-	@echo "=> Starting Go backend server..."
+	@echo "=> Starting Go backend server (DEBUG mode)..."
 	go mod tidy
-	go run cmd/server/main.go
+	LOG_LEVEL=DEBUG go run cmd/server/main.go
 
 # ------------------------------------------
 # 构建打包 (Build)
