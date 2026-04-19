@@ -41,6 +41,7 @@ func InitRouter(wm *worker.Manager) *gin.Engine {
 		api.PUT("/tasks/:id", updateTask)
 		api.DELETE("/tasks/:id", deleteTask)
 		api.POST("/tasks/:id/run", runTask)
+		api.POST("/tasks/run_all", runAllTasks)
 		api.POST("/tasks/:id/dismiss", dismissTaskAPI)
 		api.POST("/tasks/preview", previewTask)
 		api.POST("/tasks/parse_share", parseShareLinkInfo)
@@ -339,6 +340,44 @@ func runTask(c *gin.Context) {
 
 	WorkerManager.Submit(worker.Job{Task: &task})
 	c.PureJSON(http.StatusOK, gin.H{"message": "task submitted to worker pool"})
+}
+
+func runAllTasks(c *gin.Context) {
+	slog.Info("请求批量运行所有任务")
+
+	var tasks []db.Task
+	// 筛选条件：1. status 不是 running; 2. message 中不包含 [Fatal]
+	err := db.DB.Preload("Account").
+		Where("status != ?", "running").
+		Where("message NOT LIKE ? OR message IS NULL", "%[Fatal]%").
+		Find(&tasks).Error
+
+	if err != nil {
+		slog.Error("获取批量运行任务列表失败", "error", err)
+		c.PureJSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch tasks"})
+		return
+	}
+
+	count := 0
+	for i := range tasks {
+		task := &tasks[i]
+		// 更新状态
+		task.Status = "running"
+		task.Stage = "Started"
+		db.DB.Model(task).Updates(map[string]interface{}{
+			"status": "running",
+			"stage":  "Started",
+		})
+		utils.BroadcastTaskUpdate(task)
+
+		// 提交到工作池
+		WorkerManager.Submit(worker.Job{Task: task})
+		count++
+	}
+
+	utils.BroadcastStatsUpdate()
+	slog.Info("批量运行任务提交完成", "total_triggered", count)
+	c.PureJSON(http.StatusOK, gin.H{"message": fmt.Sprintf("批量执行已开启，共触发 %d 个任务", count), "count": count})
 }
 
 func dismissTaskAPI(c *gin.Context) {
