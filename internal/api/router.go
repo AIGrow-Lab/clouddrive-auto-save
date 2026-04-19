@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -56,8 +57,41 @@ func InitRouter(wm *worker.Manager) *gin.Engine {
 	}
 
 	// 静态资源处理
+	staticFS := GetStaticFS()
+	fileServer := http.FileServer(staticFS)
+
 	r.NoRoute(func(c *gin.Context) {
-		http.FileServer(GetStaticFS()).ServeHTTP(c.Writer, c.Request)
+		path := c.Request.URL.Path
+		// 1. 如果是 API 请求，直接返回 404
+		if strings.HasPrefix(path, "/api") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "API route not found"})
+			return
+		}
+
+		// 2. 如果是请求具体的文件（带点 .），尝试通过 FileServer 处理
+		if strings.Contains(path, ".") {
+			fileServer.ServeHTTP(c.Writer, c.Request)
+			return
+		}
+
+		// 3. 对于页面路由（如 /tasks 或 /），手动返回 index.html 内容
+		// 使用 Open + ReadAll 绕过 http.ServeFile 的自动重定向逻辑
+		f, err := staticFS.Open("index.html")
+		if err != nil {
+			slog.Error("无法打开 index.html", "error", err)
+			c.String(http.StatusNotFound, "Frontend assets not found")
+			return
+		}
+		defer f.Close()
+
+		content, err := io.ReadAll(f)
+		if err != nil {
+			slog.Error("读取 index.html 失败", "error", err)
+			c.String(http.StatusInternalServerError, "Internal Server Error")
+			return
+		}
+
+		c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 	})
 
 	return r
@@ -390,9 +424,9 @@ func dismissTaskAPI(c *gin.Context) {
 }
 
 func getDashboardStats(c *gin.Context) {
-	// 获取全局调度开关状态
+	// 获取全局调度开关状态 (使用 Find 避免 record not found 日志噪音)
 	var enabledSetting db.Setting
-	db.DB.Where("key = ?", "global_schedule_enabled").First(&enabledSetting)
+	db.DB.Where("key = ?", "global_schedule_enabled").Limit(1).Find(&enabledSetting)
 	globalEnabled := enabledSetting.Value == "true"
 
 	var scheduledTasks int64
@@ -405,7 +439,8 @@ func getDashboardStats(c *gin.Context) {
 	}
 
 	var capacityUsed int64
-	db.DB.Model(&db.Account{}).Where("status = 1").Select("SUM(capacity_used)").Scan(&capacityUsed)
+	// 使用 COALESCE 避免在无账号时 SUM 返回 NULL 导致 Scan 报错
+	db.DB.Model(&db.Account{}).Where("status = 1").Select("COALESCE(SUM(capacity_used), 0)").Scan(&capacityUsed)
 
 	var todayCompleted int64
 	db.DB.Model(&db.Task{}).Where("status = ? AND DATE(last_run) = DATE('now', 'localtime')", "success").Count(&todayCompleted)
@@ -473,8 +508,8 @@ func getScheduleSettings(c *gin.Context) {
 	var enabledSetting db.Setting
 	var cronSetting db.Setting
 
-	db.DB.Where("key = ?", "global_schedule_enabled").First(&enabledSetting)
-	db.DB.Where("key = ?", "global_schedule_cron").First(&cronSetting)
+	db.DB.Where("key = ?", "global_schedule_enabled").Limit(1).Find(&enabledSetting)
+	db.DB.Where("key = ?", "global_schedule_cron").Limit(1).Find(&cronSetting)
 
 	c.PureJSON(http.StatusOK, gin.H{
 		"enabled": enabledSetting.Value == "true",
