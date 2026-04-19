@@ -37,6 +37,13 @@ export function runTask(id) {
   })
 }
 
+export function runAllTasks() {
+  return request({
+    url: '/tasks/run_all',
+    method: 'post'
+  })
+}
+
 export function dismissTask(id) {
   return request({
     url: `/tasks/${id}/dismiss`,

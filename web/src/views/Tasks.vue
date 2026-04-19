@@ -5,7 +5,20 @@
         <h2>任务管理</h2>
         <p>监控并自动转存 139 和 Quark 的分享资源</p>
       </div>
-      <el-button type="primary" :icon="Plus" @click="openAddDialog">创建任务</el-button>
+      <div class="header-actions">
+        <el-popconfirm
+          title="确定要一键启动所有可运行的任务吗？"
+          confirm-button-text="确认"
+          cancel-button-text="取消"
+          width="240"
+          @confirm="handleRunAll"
+        >
+          <template #reference>
+            <el-button :icon="Play" :loading="runningAll">全部运行</el-button>
+          </template>
+        </el-popconfirm>
+        <el-button type="primary" :icon="Plus" @click="openAddDialog">创建任务</el-button>
+      </div>
     </div>
 
     <!-- 全局调度控制 -->
@@ -458,12 +471,13 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { Plus, Play, Edit, Trash2, RefreshCw, Folder, File, Info, Cloud, ExternalLink, AlertTriangle, Clock } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTasks, createTask, updateTask, deleteTask, runTask, previewTask, parseShareLink, getScheduleSettings, updateScheduleSettings } from '../api/task'
+import { getTasks, createTask, updateTask, deleteTask, runTask, runAllTasks, previewTask, parseShareLink, getScheduleSettings, updateScheduleSettings } from '../api/task'
 import { getAccounts, getFolders, createFolder } from '../api/account'
 
 const taskList = ref([])
 const accounts = ref([])
 const loading = ref(false)
+const runningAll = ref(false)
 const dialogVisible = ref(false)
 const submitting = ref(false)
 
@@ -919,6 +933,26 @@ const handleRun = async (row) => {
   }
 }
 
+const handleRunAll = async () => {
+  runningAll.value = true
+  try {
+    const res = await runAllTasks()
+    ElMessage.success(res.message || `批量执行已开启，已成功触发 ${res.count} 个任务`)
+    
+    // 立即在前端反馈所有满足条件的任务状态
+    taskList.value.forEach(task => {
+      const isFatal = task.message && task.message.includes('[Fatal]')
+      if (task.status !== 'running' && !isFatal) {
+        task.status = 'running'
+      }
+    })
+  } catch (err) {
+    // 错误已由拦截器展示
+  } finally {
+    runningAll.value = false
+  }
+}
+
 const handleDelete = (row) => {
   ElMessageBox.confirm('确定要删除此转存任务吗？', '确认', {
     type: 'warning'
@@ -998,11 +1032,18 @@ onUnmounted(() => {
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 24px;
 }
 
+.header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
 .title-section h2 {
+
   margin: 0;
   font-size: 24px;
 }
