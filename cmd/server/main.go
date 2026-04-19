@@ -42,7 +42,7 @@ func main() {
 
 	// 2. 启动任务管理器 (并发数为 3)
 	log.Println("Starting worker manager...")
-	wm := worker.NewManager(3)
+	wm := worker.NewManager(3, db.DB)
 	wm.Start()
 	defer wm.Stop()
 

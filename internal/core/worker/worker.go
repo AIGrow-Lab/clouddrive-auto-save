@@ -11,6 +11,7 @@ import (
 	"github.com/zcq/clouddrive-auto-save/internal/core/renamer"
 	"github.com/zcq/clouddrive-auto-save/internal/db"
 	"github.com/zcq/clouddrive-auto-save/internal/utils"
+	"gorm.io/gorm"
 )
 
 // Job 代表一个待执行的转存任务
@@ -18,22 +19,24 @@ type Job struct {
 	Task *db.Task
 }
 
-// Manager 负责管理 Worker 池和任务分发
+// Manager 负责管理 Worker 池 and 任务分发
 type Manager struct {
 	workers  int
 	jobQueue chan Job
 	wg       sync.WaitGroup
 	ctx      context.Context
 	cancel   context.CancelFunc
+	db       *gorm.DB
 }
 
-func NewManager(numWorkers int) *Manager {
+func NewManager(numWorkers int, dbInst *gorm.DB) *Manager {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Manager{
 		workers:  numWorkers,
 		jobQueue: make(chan Job, 100),
 		ctx:      ctx,
 		cancel:   cancel,
+		db:       dbInst,
 	}
 }
 
@@ -79,7 +82,7 @@ func (m *Manager) updateProgress(task *db.Task, percent int, stage, message stri
 	task.Percent = percent
 	task.Stage = stage
 	task.Message = message
-	db.DB.Model(task).Updates(map[string]interface{}{
+	m.db.Model(task).Updates(map[string]interface{}{
 		"percent": percent,
 		"stage":   stage,
 		"message": message,
@@ -93,7 +96,7 @@ func (m *Manager) execute(task *db.Task) {
 	m.updateProgress(task, 5, "Started", "任务已进入执行队列")
 
 	// 1. 更新任务状态为 running
-	db.DB.Model(task).Update("status", "running")
+	m.db.Model(task).Update("status", "running")
 
 	driver := core.GetDriver(&task.Account)
 	if driver == nil {
@@ -217,7 +220,7 @@ func (m *Manager) finishTask(task *db.Task, status, message string) {
 		task.Stage = "Failed"
 	}
 
-	db.DB.Model(task).Updates(map[string]interface{}{
+	m.db.Model(task).Updates(map[string]interface{}{
 		"status":   status,
 		"message":  message,
 		"last_run": task.LastRun,
