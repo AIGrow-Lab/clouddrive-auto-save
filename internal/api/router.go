@@ -3,6 +3,12 @@ package api
 import (
 	"context"
 	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"strconv"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/zcq/clouddrive-auto-save/internal/core"
 	_ "github.com/zcq/clouddrive-auto-save/internal/core/cloud139"
@@ -11,11 +17,6 @@ import (
 	"github.com/zcq/clouddrive-auto-save/internal/core/worker"
 	"github.com/zcq/clouddrive-auto-save/internal/db"
 	"github.com/zcq/clouddrive-auto-save/internal/utils"
-	"io"
-	"log"
-	"net/http"
-	"strconv"
-	"time"
 )
 
 var WorkerManager *worker.Manager
@@ -116,13 +117,13 @@ func checkAccount(c *gin.Context) {
 	id := c.Param("id")
 	var account db.Account
 	if err := db.DB.First(&account, id).Error; err != nil {
-		log.Printf("[API] 账号校验失败: 未找到 ID=%s", id)
+		slog.Error("账号校验失败: 未找到", "account_id", id)
 		c.PureJSON(http.StatusNotFound, gin.H{"error": "account not found"})
 		return
 	}
 
 	if err := performAccountCheck(&account, c.Request.Context()); err != nil {
-		log.Printf("[API] 账号校验失败: %v", err)
+		slog.Error("账号校验失败", "account_id", id, "error", err)
 		c.PureJSON(http.StatusUnauthorized, gin.H{"error": err.Error(), "account": account})
 		return
 	}
@@ -142,7 +143,7 @@ func createAccount(c *gin.Context) {
 		c.PureJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	log.Printf("[API] 添加账号: %s (%s)", account.AccountName, account.Platform)
+	slog.Info("添加账号", "name", account.AccountName, "platform", account.Platform)
 	if err := db.DB.Create(&account).Error; err != nil {
 		c.PureJSON(http.StatusInternalServerError, gin.H{"error": "failed to create account"})
 		return
@@ -150,7 +151,7 @@ func createAccount(c *gin.Context) {
 
 	// 自动执行一次校验
 	if err := performAccountCheck(&account, c.Request.Context()); err != nil {
-		log.Printf("[API] 账号自动校验失败: %v", err)
+		slog.Error("添加账号后自动校验失败", "name", account.AccountName, "error", err)
 	}
 
 	c.PureJSON(http.StatusOK, account)
@@ -167,7 +168,7 @@ func updateAccount(c *gin.Context) {
 		c.PureJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	log.Printf("[API] 更新账号: %s", account.AccountName)
+	slog.Info("更新账号", "name", account.AccountName)
 	if err := db.DB.Save(&account).Error; err != nil {
 		c.PureJSON(http.StatusInternalServerError, gin.H{"error": "failed to update account"})
 		return
@@ -175,7 +176,7 @@ func updateAccount(c *gin.Context) {
 
 	// 自动执行一次校验
 	if err := performAccountCheck(&account, c.Request.Context()); err != nil {
-		log.Printf("[API] 账号自动校验失败: %v", err)
+		slog.Error("更新账号后自动校验失败", "name", account.AccountName, "error", err)
 	}
 
 	c.PureJSON(http.StatusOK, account)
@@ -188,12 +189,12 @@ func deleteAccount(c *gin.Context) {
 	var count int64
 	db.DB.Model(&db.Task{}).Where("account_id = ?", id).Count(&count)
 	if count > 0 {
-		log.Printf("[API] 尝试删除账号失败: ID=%s, 存在 %d 个关联任务", id, count)
+		slog.Error("尝试删除账号失败: 存在关联任务", "account_id", id, "task_count", count)
 		c.PureJSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("该账号有关联的 %d 个任务，请先删除关联任务", count)})
 		return
 	}
 
-	log.Printf("[API] 删除账号: ID=%s", id)
+	slog.Info("删除账号", "account_id", id)
 	db.DB.Delete(&db.Account{}, id)
 	c.PureJSON(http.StatusOK, gin.H{"message": "deleted"})
 }
@@ -219,7 +220,7 @@ func createTask(c *gin.Context) {
 		}
 	}
 
-	log.Printf("[API] 创建任务: %s", task.Name)
+	slog.Info("创建任务", "name", task.Name)
 	db.DB.Create(&task)
 
 	// 推送实时事件
@@ -257,7 +258,7 @@ func updateTask(c *gin.Context) {
 		}
 	}
 
-	log.Printf("[API] 更新任务: %s", task.Name)
+	slog.Info("更新任务", "name", task.Name)
 
 	updateData := map[string]interface{}{
 		"name":            task.Name,
@@ -275,7 +276,7 @@ func updateTask(c *gin.Context) {
 
 	// 仅当分享链接或提取码发生变动时，才重置状态以解除 [Fatal] 封锁
 	if task.ShareURL != oldURL || task.ExtractCode != oldCode {
-		log.Printf("[API] 检测到关键参数变更，自动重置任务状态: %s", task.Name)
+		slog.Info("检测到关键参数变更，自动重置任务状态", "name", task.Name)
 		updateData["status"] = "pending"
 		updateData["message"] = ""
 	}
@@ -296,7 +297,7 @@ func updateTask(c *gin.Context) {
 
 func deleteTask(c *gin.Context) {
 	id := c.Param("id")
-	log.Printf("[API] 删除任务: ID=%s", id)
+	slog.Info("删除任务", "task_id", id)
 
 	idNum, _ := strconv.Atoi(id)
 	scheduler.Global.RemoveTask(uint(idNum))
@@ -313,7 +314,7 @@ func deleteTask(c *gin.Context) {
 func runTask(c *gin.Context) {
 	idStr := c.Param("id")
 	id, _ := strconv.Atoi(idStr)
-	log.Printf("[API] 请求运行任务: ID=%d", id)
+	slog.Info("请求运行任务", "task_id", id)
 
 	var task db.Task
 	if err := db.DB.Preload("Account").First(&task, id).Error; err != nil {
@@ -386,7 +387,6 @@ func getDashboardStats(c *gin.Context) {
 	db.DB.Where("message != ''").Order("last_run desc").Limit(15).Find(&recentTasks)
 
 	c.PureJSON(http.StatusOK, gin.H{
-
 		"scheduled_tasks":    scheduledTasks,
 		"capacity_used":      capacityUsed,
 		"today_completed":    todayCompleted,

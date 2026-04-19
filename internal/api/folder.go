@@ -1,121 +1,97 @@
 package api
 
 import (
+	"log/slog"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/zcq/clouddrive-auto-save/internal/core"
 	"github.com/zcq/clouddrive-auto-save/internal/db"
-	"log"
-	"net/http"
 )
-
-// FolderItem 为前端 TreeSelect 提供的结构
-type FolderItem struct {
-	ID     string `json:"id"`
-	Path   string `json:"path"`
-	Label  string `json:"label"`
-	IsLeaf bool   `json:"isLeaf"`
-}
 
 func getAccountFolders(c *gin.Context) {
 	id := c.Param("id")
-	parentID := c.DefaultQuery("parent_id", "")
-	parentPath := c.DefaultQuery("parent_path", "/")
+	parentID := c.Query("parent_id")
+	parentPath := c.Query("parent_path")
 
-	log.Printf("[API] 正在获取账号目录树: AccountID=%s, ParentID=%s, ParentPath=%s", id, parentID, parentPath)
+	slog.Info("正在获取账号目录树", "account_id", id, "parent_id", parentID, "parent_path", parentPath)
 
 	var account db.Account
 	if err := db.DB.First(&account, id).Error; err != nil {
-		log.Printf("[API] 获取目录失败: 账号未找到 (ID: %s)", id)
-		c.PureJSON(http.StatusNotFound, gin.H{"error": "account not found"})
+		slog.Error("获取目录失败: 账号未找到", "account_id", id)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Account not found"})
 		return
 	}
 
 	driver := core.GetDriver(&account)
 	if driver == nil {
-		log.Printf("[API] 获取目录失败: 驱动加载失败 (Platform: %s)", account.Platform)
-		c.PureJSON(http.StatusInternalServerError, gin.H{"error": "driver not found"})
+		slog.Error("获取目录失败: 驱动加载失败", "platform", account.Platform)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Driver not found"})
 		return
 	}
 
-	ctx := c.Request.Context()
-	files, err := driver.ListFiles(ctx, parentID)
+	folders, err := driver.ListFiles(c.Request.Context(), parentID)
 	if err != nil {
-		log.Printf("[API] 获取目录异常: %v", err)
-		c.PureJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		slog.Error("获取目录异常", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	var folders []FolderItem
-	for _, f := range files {
+	// 仅保留文件夹
+	var result []core.FileInfo
+	for _, f := range folders {
 		if f.IsFolder {
-			childPath := parentPath
-			if childPath == "/" {
-				childPath = "/" + f.Name
-			} else {
-				childPath = childPath + "/" + f.Name
+			// 如果是 139，Path 字段可能需要处理
+			if account.Platform == "139" && f.Path == "" {
+				f.Path = f.ID
 			}
-			folders = append(folders, FolderItem{
-				ID:     f.ID,
-				Path:   childPath,
-				Label:  f.Name,
-				IsLeaf: false,
-			})
+			result = append(result, f)
 		}
 	}
 
-	log.Printf("[API] 获取目录完成: AccountID=%s, 发现 %d 个子文件夹", id, len(folders))
-	c.PureJSON(http.StatusOK, folders)
+	slog.Info("获取目录完成", "account_id", id, "folder_count", len(result))
+	c.JSON(http.StatusOK, result)
 }
 
 func createAccountFolder(c *gin.Context) {
 	id := c.Param("id")
 	var req struct {
-		ParentID   string `json:"parent_id"`
+		Name       string `json:"name"`
 		ParentPath string `json:"parent_path"`
-		Name       string `json:"name" binding:"required"`
 	}
-
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.PureJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	log.Printf("[API] 正在创建文件夹: AccountID=%s, Name=%s, ParentPath=%s", id, req.Name, req.ParentPath)
+	slog.Info("正在创建目录", "account_id", id, "name", req.Name, "parent_path", req.ParentPath)
 
 	var account db.Account
 	if err := db.DB.First(&account, id).Error; err != nil {
-		log.Printf("[API] 创建文件夹失败: 账号未找到 (ID: %s)", id)
-		c.PureJSON(http.StatusNotFound, gin.H{"error": "account not found"})
+		slog.Error("创建文件夹失败: 账号未找到", "account_id", id)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Account not found"})
 		return
 	}
 
 	driver := core.GetDriver(&account)
 	if driver == nil {
-		log.Printf("[API] 创建文件夹失败: 驱动加载失败 (Platform: %s)", account.Platform)
-		c.PureJSON(http.StatusInternalServerError, gin.H{"error": "driver not found"})
+		slog.Error("创建文件夹失败: 驱动加载失败", "platform", account.Platform)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Driver not found"})
 		return
 	}
 
-	ctx := c.Request.Context()
-	newFolder, err := driver.CreateFolder(ctx, req.ParentID, req.Name)
+	_, err := driver.CreateFolder(c.Request.Context(), req.ParentPath, req.Name)
 	if err != nil {
-		log.Printf("[API] 创建文件夹异常: %v", err)
-		c.PureJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		slog.Error("创建文件夹异常", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	childPath := req.ParentPath
-	if childPath == "/" || childPath == "" {
-		childPath = "/" + newFolder.Name
-	} else {
-		childPath = childPath + "/" + newFolder.Name
+	childPath := req.Name
+	if req.ParentPath != "" && req.ParentPath != "/" && req.ParentPath != "0" && req.ParentPath != "root" {
+		childPath = req.ParentPath + "/" + req.Name
 	}
 
-	log.Printf("[API] 创建文件夹完成: Path=%s", childPath)
-	c.PureJSON(http.StatusOK, FolderItem{
-		ID:     newFolder.ID,
-		Path:   childPath,
-		Label:  newFolder.Name,
-		IsLeaf: false,
-	})
+	slog.Info("创建文件夹完成", "path", childPath)
+	c.JSON(http.StatusOK, gin.H{"path": childPath})
 }

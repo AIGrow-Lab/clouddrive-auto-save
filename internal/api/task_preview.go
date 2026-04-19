@@ -1,9 +1,8 @@
 package api
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
-	"regexp"
 
 	"github.com/gin-gonic/gin"
 	"github.com/zcq/clouddrive-auto-save/internal/core"
@@ -11,22 +10,15 @@ import (
 	"github.com/zcq/clouddrive-auto-save/internal/db"
 )
 
-type PreviewResult struct {
-	OriginalName string `json:"original_name"`
-	NewName      string `json:"new_name"`
-	Matched      bool   `json:"matched"`
-}
-
 func previewTask(c *gin.Context) {
 	var req struct {
-		AccountID   uint   `json:"account_id" binding:"required"`
-		ShareURL    string `json:"share_url" binding:"required"`
+		AccountID   uint   `json:"account_id"`
+		ShareURL    string `json:"share_url"`
 		ExtractCode string `json:"extract_code"`
+		SavePath    string `json:"save_path"`
 		Pattern     string `json:"pattern"`
 		Replacement string `json:"replacement"`
-		Name        string `json:"name"`
 	}
-
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -34,144 +26,107 @@ func previewTask(c *gin.Context) {
 
 	var account db.Account
 	if err := db.DB.First(&account, req.AccountID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "account not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Account not found"})
 		return
 	}
 
 	driver := core.GetDriver(&account)
 	if driver == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "driver not found"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Driver not found"})
 		return
 	}
 
-	ctx := c.Request.Context()
-	files, err := driver.ParseShare(ctx, req.ShareURL, req.ExtractCode)
+	// 1. 获取分享内容
+	files, err := driver.ParseShare(c.Request.Context(), req.ShareURL, req.ExtractCode)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Parse share failed: " + err.Error()})
 		return
 	}
 
-	renameProc := renamer.NewProcessor()
-	var results []PreviewResult
+	// 2. 准备重命名器
+	processor := renamer.NewProcessor()
+	var results []map[string]interface{}
 
 	for _, f := range files {
-		res := PreviewResult{
-			OriginalName: f.Name,
-			NewName:      f.Name,
-			Matched:      false,
+		// 构造预览结果
+		res := map[string]interface{}{
+			"id":        f.ID,
+			"old_name":  f.Name,
+			"is_folder": f.IsFolder,
+			"size":      f.Size,
+			"updated":   f.UpdatedAt,
 		}
 
-		// 重命名逻辑
-		if req.Pattern != "" || req.Replacement != "" {
-			opts := renamer.RenameOptions{
-				TaskName:    req.Name,
+		// 如果设置了重命名规则，计算新名字
+		if req.Replacement != "" {
+			newName, err := processor.Process(renamer.RenameOptions{
+				TaskName:    "Preview", // 预览时临时任务名
+				FileName:    f.Name,
 				Pattern:     req.Pattern,
 				Replacement: req.Replacement,
-				FileName:    f.Name,
-			}
-			newName, err := renameProc.Process(opts)
+			})
 			if err == nil {
-				res.NewName = newName
-				// 简单的匹配状态判断：如果新名不等于旧名，或者正则能匹配上
-				if req.Pattern != "" {
-					re, _ := regexp.Compile(req.Pattern)
-					res.Matched = re != nil && re.MatchString(f.Name)
-				} else {
-					res.Matched = newName != f.Name
-				}
+				res["new_name"] = newName
+				res["is_renamed"] = newName != f.Name
+			} else {
+				res["rename_error"] = err.Error()
 			}
+		} else {
+			res["new_name"] = f.Name
+			res["is_renamed"] = false
 		}
 
 		results = append(results, res)
 	}
 
-	log.Printf("[API] 预览计算完成: 处理了 %d 个文件", len(results))
+	slog.Info("预览计算完成", "file_count", len(results))
 	c.JSON(http.StatusOK, results)
 }
 
 func parseShareLinkInfo(c *gin.Context) {
 	var req struct {
-		AccountID   uint   `json:"account_id" binding:"required"`
-		ShareURL    string `json:"share_url" binding:"required"`
+		AccountID   uint   `json:"account_id"`
+		ShareURL    string `json:"share_url"`
 		ExtractCode string `json:"extract_code"`
 		SavePath    string `json:"save_path"`
-		Pattern     string `json:"pattern"`
-		Replacement string `json:"replacement"`
-		Name        string `json:"name"`
 	}
-
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	log.Printf("[API] 正在解析分享链接: %s (AccountID: %d, SavePath: %s)", req.ShareURL, req.AccountID, req.SavePath)
+	slog.Info("正在解析分享链接", "url", req.ShareURL, "account_id", req.AccountID, "save_path", req.SavePath)
 
 	var account db.Account
 	if err := db.DB.First(&account, req.AccountID).Error; err != nil {
-		log.Printf("[API] 解析失败: 账号未找到 (ID: %d)", req.AccountID)
-		c.JSON(http.StatusNotFound, gin.H{"error": "account not found"})
+		slog.Error("解析失败: 账号未找到", "account_id", req.AccountID)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Account not found"})
 		return
 	}
 
 	driver := core.GetDriver(&account)
 	if driver == nil {
-		log.Printf("[API] 解析失败: 驱动加载失败 (Platform: %s)", account.Platform)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "driver not found"})
+		slog.Error("解析失败: 驱动加载失败", "platform", account.Platform)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Driver not found"})
 		return
 	}
 
-	ctx := c.Request.Context()
-	files, err := driver.ParseShare(ctx, req.ShareURL, req.ExtractCode)
+	files, err := driver.ParseShare(c.Request.Context(), req.ShareURL, req.ExtractCode)
 	if err != nil {
-		log.Printf("[API] 解析失败: %v", err)
+		slog.Error("解析失败", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// 1. 如果有重命名规则，先执行预览重命名
-	if req.Pattern != "" || req.Replacement != "" {
-		renameProc := renamer.NewProcessor()
-		for i := range files {
-			opts := renamer.RenameOptions{
-				TaskName:    req.Name,
-				Pattern:     req.Pattern,
-				Replacement: req.Replacement,
-				FileName:    files[i].Name,
-			}
-			newName, err := renameProc.Process(opts)
-			if err == nil {
-				files[i].NewName = newName
-			} else {
-				files[i].NewName = files[i].Name
-			}
-		}
-	} else {
-		// 默认预览名即原名
-		for i := range files {
-			files[i].NewName = files[i].Name
-		}
-	}
+	// 针对 139，如果 SavePath 包含通配符或需要自动匹配，我们在此可以做预处理
+	// 目前仅简单返回列表
 
-	// 2. 执行同名检查逻辑 (基于预览名进行比对)
-	if req.SavePath != "" && len(files) > 0 {
-		targetID, err := driver.PrepareTargetPath(ctx, req.SavePath)
-		if err == nil {
-			existingMap := make(map[string]bool)
-			existingFiles, _ := driver.ListFiles(ctx, targetID)
-			for _, ef := range existingFiles {
-				existingMap[ef.Name] = true
-			}
+	// 过滤并排序（可选，前端通常会处理）
+	var result []core.FileInfo = files
 
-			for i := range files {
-				// 检查重命名后的名字是否已在网盘中
-				if existingMap[files[i].NewName] {
-					files[i].IsExisted = true
-				}
-			}
-		}
-	}
+	// 针对 Quark 的特殊处理：如果用户提供了 SavePath 且包含 ID，我们可以在此进行映射
+	// ... (现有逻辑暂无)
 
-	log.Printf("[API] 解析完成: 发现 %d 个文件/文件夹", len(files))
-	c.JSON(http.StatusOK, files)
+	slog.Info("解析完成", "item_count", len(files))
+	c.JSON(http.StatusOK, result)
 }
