@@ -9,7 +9,11 @@ import (
 
 // MockDriver 模拟网盘驱动
 type MockDriver struct {
-	Files []core.FileInfo
+	Files         []core.FileInfo // 用于 ListFiles
+	ShareFiles    []core.FileInfo // 用于 ParseShare
+	SaveLinkCalls int
+	SavedFileIDs  []string
+	TargetPaths   []string
 }
 
 func (m *MockDriver) GetInfo(ctx context.Context) (*db.Account, error) {
@@ -33,10 +37,16 @@ func (m *MockDriver) DeleteFile(ctx context.Context, fileID string) error {
 }
 
 func (m *MockDriver) ParseShare(ctx context.Context, shareURL, extractCode string) ([]core.FileInfo, error) {
+	if len(m.ShareFiles) > 0 {
+		return m.ShareFiles, nil
+	}
 	return m.Files, nil
 }
 
 func (m *MockDriver) SaveLink(ctx context.Context, shareURL, extractCode, targetPath string, fileIDs []string) error {
+	m.SaveLinkCalls++
+	m.SavedFileIDs = append(m.SavedFileIDs, fileIDs...)
+	m.TargetPaths = append(m.TargetPaths, targetPath)
 	return nil
 }
 

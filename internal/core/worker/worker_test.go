@@ -93,3 +93,126 @@ func TestManager_Execute_SkipExisting(t *testing.T) {
 		t.Errorf("expected success, got %s", updatedTask.Status)
 	}
 }
+
+func TestManager_Execute_StartFileFilter(t *testing.T) {
+	testDB := setupTestDB(t)
+	m := NewManager(1, testDB)
+
+	now := time.Now()
+	files := []core.FileInfo{
+		{ID: "f1", Name: "old.mp4", UpdateTime: now.Add(-2 * time.Hour)},
+		{ID: "f2", Name: "start.mp4", UpdateTime: now.Add(-1 * time.Hour)},
+		{ID: "f3", Name: "new.mp4", UpdateTime: now},
+	}
+
+	var spy *MockDriver
+	core.RegisterDriver("mock_startfile", func(account *db.Account) core.CloudDrive {
+		spy = &MockDriver{ShareFiles: files}
+		return spy
+	})
+
+	account := db.Account{Platform: "mock_startfile", Nickname: "TestUser"}
+	testDB.Create(&account)
+
+	task := db.Task{
+		AccountID:    account.ID,
+		Account:      account,
+		Name:         "StartFileTask",
+		ShareURL:     "http://share.com/1",
+		SavePath:     "/test",
+		StartFileID:  "f2", // 从 f2 开始
+		ScheduleMode: "off",
+	}
+	testDB.Create(&task)
+
+	m.execute(&task)
+
+	if spy.SaveLinkCalls == 0 {
+		t.Fatal("expected SaveLink to be called")
+	}
+
+	idSet := make(map[string]bool)
+	for _, id := range spy.SavedFileIDs {
+		idSet[id] = true
+	}
+
+	if !idSet["f2"] || !idSet["f3"] {
+		t.Errorf("expected f2 and f3 to be saved, got %v", spy.SavedFileIDs)
+	}
+	if idSet["f1"] {
+		t.Errorf("expected f1 to be filtered out, but it was saved")
+	}
+}
+
+func TestManager_Execute_RegexFilter(t *testing.T) {
+	testDB := setupTestDB(t)
+	m := NewManager(1, testDB)
+
+	files := []core.FileInfo{
+		{ID: "f1", Name: "movie.mp4", UpdateTime: time.Now()},
+		{ID: "f2", Name: "info.txt", UpdateTime: time.Now()},
+	}
+
+	var spy *MockDriver
+	core.RegisterDriver("mock_regex", func(account *db.Account) core.CloudDrive {
+		spy = &MockDriver{ShareFiles: files}
+		return spy
+	})
+
+	account := db.Account{Platform: "mock_regex", Nickname: "TestUser"}
+	testDB.Create(&account)
+
+	task := db.Task{
+		AccountID: account.ID,
+		Account:   account,
+		Name:      "RegexTask",
+		Pattern:   ".*\\.mp4$", // 仅匹配 mp4
+		ShareURL:  "http://share.com/1",
+		SavePath:  "/test",
+	}
+	testDB.Create(&task)
+
+	m.execute(&task)
+
+	if len(spy.SavedFileIDs) != 1 || spy.SavedFileIDs[0] != "f1" {
+		t.Errorf("expected only f1 (mp4) to be saved, got %v", spy.SavedFileIDs)
+	}
+}
+
+func TestManager_Execute_Deduplication_With_Renamer(t *testing.T) {
+	testDB := setupTestDB(t)
+	m := NewManager(1, testDB)
+
+	var spy *MockDriver
+	core.RegisterDriver("mock_dedup", func(account *db.Account) core.CloudDrive {
+		spy = &MockDriver{
+			ShareFiles: []core.FileInfo{
+				{ID: "f1", Name: "original.mp4", UpdateTime: time.Now()},
+			},
+			Files: []core.FileInfo{
+				{ID: "existing_id", Name: "MyTask.mp4"}, // 模拟目标目录已存在重命名后的名字
+			},
+		}
+		return spy
+	})
+
+	account := db.Account{Platform: "mock_dedup", Nickname: "TestUser"}
+	testDB.Create(&account)
+
+	task := db.Task{
+		AccountID:   account.ID,
+		Account:     account,
+		Name:        "MyTask",
+		Pattern:     "original",
+		Replacement: "{TASKNAME}.{EXT}", // 预期重命名为 MyTask.mp4
+		ShareURL:    "http://share.com/1",
+		SavePath:    "/test",
+	}
+	testDB.Create(&task)
+
+	m.execute(&task)
+
+	if spy.SaveLinkCalls > 0 && len(spy.SavedFileIDs) > 0 {
+		t.Errorf("expected file to be skipped due to deduplication, but SaveLink was called with %v", spy.SavedFileIDs)
+	}
+}
