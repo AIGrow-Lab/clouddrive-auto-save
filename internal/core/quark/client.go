@@ -38,7 +38,7 @@ func init() {
 func NewQuark(account *db.Account) *Quark {
 	q := &Quark{
 		account: account,
-		client:  &http.Client{Timeout: 30 * time.Second},
+		client:  &http.Client{Timeout: 30 * time.Second, Transport: core.HTTPTransport},
 	}
 	q.mparam = q.parseMparam(account.Cookie)
 	return q

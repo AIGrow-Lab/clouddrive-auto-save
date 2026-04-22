@@ -44,7 +44,7 @@ func init() {
 func NewCloud139(account *db.Account) *Cloud139 {
 	return &Cloud139{
 		account: account,
-		client:  &http.Client{Timeout: 30 * time.Second},
+		client:  &http.Client{Timeout: 30 * time.Second, Transport: core.HTTPTransport},
 	}
 }
 

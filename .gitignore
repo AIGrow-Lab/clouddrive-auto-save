@@ -45,6 +45,14 @@ data.db
 *.db-shm
 *.db-wal
 
+# E2E Testing
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
+e2e/blob-report/
+e2e/playwright/.cache/
+e2e_server.log
+
 # Environment Variables
 .env
 .env.local

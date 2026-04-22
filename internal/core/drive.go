@@ -3,8 +3,13 @@ package core
 import (
 	"context"
 	"github.com/zcq/clouddrive-auto-save/internal/db"
+	"net/http"
 	"time"
 )
+
+// HTTPTransport 是全局可替换的 HTTP 传输层，默认为 http.DefaultTransport。
+// 在 E2E 测试模式下，它会被替换为 Mock 拦截器。
+var HTTPTransport http.RoundTripper = http.DefaultTransport
 
 // FileInfo 代表云盘中的文件或文件夹信息
 type FileInfo struct {

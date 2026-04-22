@@ -131,7 +131,32 @@ test-html: test
 check: lint vet test
 	@echo "=> All checks passed successfully!"
 
+# ------------------------------------------
+# 端到端测试 (E2E Testing)
+# ------------------------------------------
+
+## e2e-setup: 安装 E2E 测试所需的 Node.js 依赖和浏览器
+e2e-setup:
+	@echo "=> Setting up E2E environment..."
+	cd e2e && npm install
+	cd e2e && npx playwright install chromium
+
+## e2e-test: 编译并运行端到端测试 (自动处理后台服务起停)
+e2e-test: build
+	@echo "=> Running E2E tests..."
+	@# 检查 8080 端口是否被占用，如果占用则尝试清理（可选）
+	@E2E_TEST_MODE=true ./bin/ucas > e2e_server.log 2>&1 & \
+	PID=$$!; \
+	echo "=> Backend started with PID: $$PID"; \
+	sleep 2; \
+	cd e2e && CI=true npx playwright test; \
+	EXIT_CODE=$$?; \
+	echo "=> Cleaning up backend (PID: $$PID)..."; \
+	kill $$PID || true; \
+	exit $$EXIT_CODE
+
 ## clean: 清理构建产物 (二进制文件、覆盖率报告和前端 dist 目录)
+
 clean:
 	@echo "=> Cleaning build artifacts..."
 	rm -rf $(BIN_DIR)
