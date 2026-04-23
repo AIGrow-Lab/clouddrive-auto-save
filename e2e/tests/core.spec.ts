@@ -8,7 +8,7 @@ test.describe('UCAS 核心功能端到端测试', () => {
 
     // 2. 交互：添加 139 账号
     await page.getByRole('button', { name: '立即绑定账号' }).click();
-    await page.getByText('移动云盘').click();
+    await page.getByText('移动云盘', { exact: true }).click();
     await page.getByLabel('Authorization').fill('mock_auth');
     
     // 点击确认并等待请求返回
@@ -23,8 +23,8 @@ test.describe('UCAS 核心功能端到端测试', () => {
 
     // 4. 交互：添加 Quark 账号
     await page.getByRole('button', { name: '添加账号' }).click();
-    await page.getByText('夸克网盘').click();
-    await page.getByLabel('Cookie 全量字符串').fill('mock_cookie');
+    await page.getByText('夸克网盘', { exact: true }).click();
+    await page.getByLabel('Cookie 全量字符串').fill('__uid=mock; mock_cookie');
 
     const createReqQuark = page.waitForResponse(resp => resp.url().includes('/api/accounts') && resp.status() === 200);
     await page.getByRole('button', { name: '确认添加' }).click();
