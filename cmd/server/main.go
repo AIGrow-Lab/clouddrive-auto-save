@@ -34,6 +34,8 @@ func main() {
 	if isE2E {
 		dbPath = "file::memory:?cache=shared"
 		slog.Info("Running in E2E TEST MODE (using memory database)")
+		// 开启 HTTP 层 Mock 拦截，让系统走真实驱动逻辑进行 JSON 解析测试
+		core.SetupE2EHTTPMock()
 	} else if dbPath == "" {
 		dbPath = "data.db"
 	}
@@ -42,25 +44,6 @@ func main() {
 	if err := db.InitDB(dbPath); err != nil {
 		slog.Error("Failed to initialize database", "error", err)
 		os.Exit(1)
-	}
-
-	if isE2E {
-		// 开启 HTTP 层 Mock 拦截，让系统走真实驱动逻辑进行 JSON 解析测试
-		core.SetupE2EHTTPMock()
-		db.DB.Create(&db.Account{
-			Platform:      "139",
-			Nickname:      "E2E测试账号(移动云盘)",
-			Status:        1,
-			CapacityUsed:  512 * 1024 * 1024 * 1024,
-			CapacityTotal: 1024 * 1024 * 1024 * 1024,
-		})
-		db.DB.Create(&db.Account{
-			Platform:      "quark",
-			Nickname:      "E2E测试账号(夸克网盘)",
-			Status:        1,
-			CapacityUsed:  512 * 1024 * 1024 * 1024,
-			CapacityTotal: 1024 * 1024 * 1024 * 1024,
-		})
 	}
 
 	// 1.5 清理异常中断的任务（重置卡在 running 状态的任务）
