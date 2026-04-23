@@ -46,10 +46,29 @@ jobs:
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
 
-      - name: Install E2E dependencies
-        run: |
-          make e2e-setup
-          cd e2e && npx playwright install-deps chromium
+      - name: Install Node modules (E2E)
+        run: cd e2e && npm install
+
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "VERSION=$(npx playwright --version | cut -d' ' -f2)" >> $GITHUB_ENV
+        working-directory: e2e
+
+      - name: Cache Playwright Browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ env.VERSION }}
+
+      - name: Install Playwright Browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+        working-directory: e2e
+
+      - name: Install Playwright OS Dependencies
+        run: npx playwright install-deps chromium
+        working-directory: e2e
 
       - name: Run E2E tests
         run: make e2e-test
