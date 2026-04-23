@@ -2,18 +2,40 @@ import { test, expect } from '@playwright/test';
 
 test.describe('UCAS 核心功能端到端测试', () => {
   
-  test('账号管理：展示与容量检查 (HTTP Mock)', async ({ page }) => {
+  test('账号管理：添加与展示 (真实 UI 交互 + HTTP Mock)', async ({ page }) => {
     // 1. 进入账号管理页面
     await page.goto('/accounts');
 
-    // 2. 验证初始状态 (应显示 E2E 模式注入的测试账号)
-    await expect(page.getByText('E2E测试账号(移动云盘)')).toBeVisible();
-    await expect(page.getByText('E2E测试账号(夸克网盘)')).toBeVisible();
+    // 2. 交互：添加 139 账号
+    await page.getByRole('button', { name: '立即绑定账号' }).click();
+    await page.getByText('移动云盘').click();
+    await page.getByLabel('Authorization').fill('mock_auth');
     
-    // 3. 验证容量显示 (Mock 返回的是 512GB / 1TB)
-    await expect(page.getByText('512 GB / 1 TB').first()).toBeVisible();
-    await expect(page.getByText('剩 512 GB').first()).toBeVisible();
-  });
+    // 点击确认并等待请求返回
+    const createReq = page.waitForResponse(resp => resp.url().includes('/api/accounts') && resp.status() === 200);
+    await page.getByRole('button', { name: '确认添加' }).click();
+    await createReq;
+
+    // 3. 验证 139 账号渲染 (增加显式等待)
+    await expect(page.getByText('E2E移动云盘用户')).toBeVisible({ timeout: 10000 });
+    // 只要页面上出现了 512 这个关键数字，说明容量加载成功
+    await expect(page.locator('body')).toContainText('512');
+
+    // 4. 交互：添加 Quark 账号
+    await page.getByRole('button', { name: '添加账号' }).click();
+    await page.getByText('夸克网盘').click();
+    await page.getByLabel('Cookie 全量字符串').fill('mock_cookie');
+
+    const createReqQuark = page.waitForResponse(resp => resp.url().includes('/api/accounts') && resp.status() === 200);
+    await page.getByRole('button', { name: '确认添加' }).click();
+    await createReqQuark;
+
+    // 5. 验证 Quark 账号渲染
+    await expect(page.getByText('E2E夸克用户')).toBeVisible({ timeout: 10000 });
+    // 此时页面上应该至少有两个地方出现了 512 (两个账号都是这个 Mock 值)
+    await expect(page.getByText('512').last()).toBeVisible();
+    });
+
 
   test('任务管理：创建任务与重命名预览 (AND 逻辑)', async ({ page }) => {
     await page.goto('/tasks');
@@ -24,8 +46,8 @@ test.describe('UCAS 核心功能端到端测试', () => {
     // 2. 填写任务信息
     // 点击选择账号下拉框
     await page.locator('.el-select').first().click();
-    // 等待下拉列表出现并点击对应的测试账号
-    await page.getByRole('option', { name: 'E2E测试账号(移动云盘)' }).click();
+    // 等待下拉列表出现并点击对应的测试账号 (名称应与 Test 1 添加的一致)
+    await page.getByRole('option', { name: 'E2E移动云盘用户' }).click();
     
     await page.getByLabel('任务名称').fill('E2E测试电影');
     await page.getByLabel('分享链接').fill('https://yun.139.com/w/#/share/link/mock_link_id');

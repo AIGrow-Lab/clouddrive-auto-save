@@ -13,6 +13,7 @@ type mockTransport struct{}
 
 func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	url := req.URL.String()
+	// 统一输出拦截日志，方便排错
 	slog.Info("[HTTP Mock Intercepted]", "method", req.Method, "url", url)
 
 	var respBody string
@@ -44,9 +45,9 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	// 2. 模拟 139 相关接口
 	if strings.Contains(url, "user-njs.yun.139.com/user/getUser") {
-		respBody = `{"success": true, "data": {"auditNickName": "E2E移动云盘用户", "userDomainId": "mock_domain", "loginName": "13800000000"}}`
+		respBody = `{"success": true, "data": {"auditNickName": "E2E移动云盘用户", "userName": "E2E移动云盘用户", "userDomainId": "mock_domain", "loginName": "13800000000"}}`
 	} else if strings.Contains(url, "user-njs.yun.139.com/user/disk/getPersonalDiskInfo") || strings.Contains(url, "user-njs.yun.139.com/user/disk/getFamilyDiskInfo") {
-		respBody = `{"success": true, "data": {"diskSize": 1048576, "freeDiskSize": 524288}}`
+		respBody = `{"success": true, "data": {"diskSize": "1048576", "freeDiskSize": "524288"}}`
 	} else if strings.Contains(url, "yun.139.com/orchestration/group-rebuild/member/v1.0/queryUserBenefits") {
 		respBody = `{"success": true, "data": {"userSubMemberList": [{"memberLvName": "黄金会员"}]}}`
 	} else if strings.Contains(url, "share-kd-njs.yun.139.com/yun-share/richlifeApp/devapp/IOutLink/getOutLinkInfoV6") {
