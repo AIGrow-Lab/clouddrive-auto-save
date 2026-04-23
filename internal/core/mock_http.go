@@ -32,7 +32,7 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		respBody = `{"code": 0, "data": {"total_capacity": 1099511627776, "use_capacity": 549755813888, "member_type": "SVIP"}}`
 	} else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/share/sharepage/detail") {
 		// 模拟返回文件列表
-		respBody = `{"code": 0, "data": {"list": [{"fid": "file1", "file_name": "[2024.04.20] E2E测试电影.mp4", "size": 1024, "updated_at": 1612345678000, "file_type": 1}, {"fid": "file2", "file_name": "readme.txt", "size": 100, "updated_at": 1612345679000, "file_type": 1}]}}`
+		respBody = `{"code": 0, "data": {"list": [{"fid": "file1", "file_name": "[2024.04.20] E2E测试电影.mp4", "size": 1024, "updated_at": 1612345678000, "dir": false, "share_fid_token": "mock_token_1"}, {"fid": "file2", "file_name": "readme.txt", "size": 100, "updated_at": 1612345679000, "dir": false, "share_fid_token": "mock_token_2"}]}}`
 	} else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/share/sharepage/token") {
 		respBody = `{"code": 0, "data": {"stoken": "mock_stoken"}}`
 	} else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/file/sort") {
@@ -45,21 +45,21 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	// 2. 模拟 139 相关接口
 	if strings.Contains(url, "user-njs.yun.139.com/user/getUser") {
-		respBody = `{"success": true, "data": {"auditNickName": "E2E移动云盘用户", "userName": "E2E移动云盘用户", "userDomainId": "mock_domain", "loginName": "13800000000"}}`
+		respBody = `{"code": "0000", "success": true, "data": {"auditNickName": "E2E移动云盘用户", "userName": "E2E移动云盘用户", "userDomainId": "mock_domain", "loginName": "13800000000"}}`
 	} else if strings.Contains(url, "user-njs.yun.139.com/user/disk/getPersonalDiskInfo") || strings.Contains(url, "user-njs.yun.139.com/user/disk/getFamilyDiskInfo") {
-		respBody = `{"success": true, "data": {"diskSize": "1048576", "freeDiskSize": "524288"}}`
+		respBody = `{"code": "0", "success": true, "data": {"diskSize": "1048576", "freeDiskSize": "524288"}}`
 	} else if strings.Contains(url, "yun.139.com/orchestration/group-rebuild/member/v1.0/queryUserBenefits") {
-		respBody = `{"success": true, "data": {"userSubMemberList": [{"memberLvName": "黄金会员"}]}}`
+		respBody = `{"code": "0", "success": true, "data": {"userSubMemberList": [{"memberLvName": "黄金会员"}]}}`
 	} else if strings.Contains(url, "share-kd-njs.yun.139.com/yun-share/richlifeApp/devapp/IOutLink/getOutLinkInfoV6") {
 		respBody = `{"code": "0", "data": {"coLst": [{"coID": "f1", "coName": "[2024.04.20] E2E测试电影.mp4", "size": 1024, "udTime": "20240420120000"}, {"coID": "f2", "coName": "readme.txt", "size": 100, "udTime": "20240420120100"}], "caLst": []}}`
 	} else if strings.Contains(url, "share-kd-njs.yun.139.com/yun-share/richlifeApp/devapp/IBatchOprTask/createOuterLinkBatchOprTask") {
 		respBody = `{"success": true}`
 	} else if strings.Contains(url, "personal-kd-njs.yun.139.com/hcy/file/list") {
-		respBody = `{"success": true, "data": {"nodeList": []}}`
+		respBody = `{"code": "0", "success": true, "data": {"items": []}}`
 	} else if strings.Contains(url, "personal-kd-njs.yun.139.com/hcy/file/update") {
-		respBody = `{"success": true}`
+		respBody = `{"code": "0", "success": true}`
 	} else if strings.Contains(url, "personal-kd-njs.yun.139.com/hcy/file/create") {
-		respBody = `{"success": true, "data": {"node": {"fileId": "mock_dir_139"}}}`
+		respBody = `{"code": "0", "success": true, "data": {"fileId": "mock_dir_139", "fileName": "mock_dir"}}`
 	}
 
 	if respBody == "" {
