@@ -90,7 +90,7 @@ func createAccountFolder(c *gin.Context) {
 		return
 	}
 
-	_, err := driver.CreateFolder(c.Request.Context(), req.ParentPath, req.Name)
+	info, err := driver.CreateFolder(c.Request.Context(), req.ParentPath, req.Name)
 	if err != nil {
 		slog.Error("创建文件夹异常", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -100,8 +100,16 @@ func createAccountFolder(c *gin.Context) {
 	childPath := req.Name
 	if req.ParentPath != "" && req.ParentPath != "/" && req.ParentPath != "0" && req.ParentPath != "root" {
 		childPath = req.ParentPath + "/" + req.Name
+	} else {
+		childPath = "/" + req.Name
 	}
 
 	slog.Info("创建文件夹完成", "path", childPath)
-	c.JSON(http.StatusOK, gin.H{"path": childPath})
+	c.JSON(http.StatusOK, gin.H{
+		"id":     info.ID,
+		"name":   info.Name,
+		"label":  info.Name,
+		"path":   childPath,
+		"isLeaf": false,
+	})
 }
