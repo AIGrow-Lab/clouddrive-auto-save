@@ -64,10 +64,16 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		respBody = `{"code": 0, "data": {"stoken": "mock_stoken"}}`
 	} else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/file/sort") {
 		// 目标目录文件列表 (预检)
-		respBody = `{"code": 0, "data": {"list": []}}`
+		if strings.Contains(url, "pdir_fid=0") {
+			respBody = `{"code": 0, "data": {"list": [{"fid": "quark_exist_dir", "file_name": "夸克已有目录", "dir": true, "size": 0, "updated_at": 1612345678000}]}}`
+		} else if strings.Contains(url, "pdir_fid=quark_exist_dir") {
+			respBody = `{"code": 0, "data": {"list": [{"fid": "quark_new_folder", "file_name": "quark_new_folder", "dir": true, "size": 0, "updated_at": 1612345679000}]}}`
+		} else {
+			respBody = `{"code": 0, "data": {"list": []}}`
+		}
 	} else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/file") && req.Method == "POST" {
 		// 创建目录
-		respBody = `{"code": 0, "data": {"fid": "mock_dir_123"}}`
+		respBody = `{"code": 0, "data": {"fid": "quark_new_folder"}}`
 	}
 
 	// 2. 模拟 139 相关接口
@@ -83,7 +89,7 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		respBody = `{"code": "0000", "success": true, "data": {"auditNickName": "` + nickname + `", "userName": "` + nickname + `", "userDomainId": "mock_domain", "loginName": "13800000000"}}`
 	} else if strings.Contains(url, "user-njs.yun.139.com/user/disk/getPersonalDiskInfo") || strings.Contains(url, "user-njs.yun.139.com/user/disk/getFamilyDiskInfo") {
 		// 返回 MB 单位
-		diskSize := "1048576"    // 1TB (1024 * 1024 MB)
+		diskSize := "1048576"   // 1TB (1024 * 1024 MB)
 		freeDiskSize := "524288" // 512GB (512 * 1024 MB)
 
 		if strings.Contains(req.Header.Get("Authorization"), "mock_normal") {
@@ -114,11 +120,20 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	} else if strings.Contains(url, "share-kd-njs.yun.139.com/yun-share/richlifeApp/devapp/IBatchOprTask/createOuterLinkBatchOprTask") {
 		respBody = `{"success": true}`
 	} else if strings.Contains(url, "personal-kd-njs.yun.139.com/hcy/file/list") {
-		respBody = `{"code": "0", "success": true, "data": {"items": []}}`
+		bodyBytes, _ := io.ReadAll(req.Body)
+		req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		bodyStr := string(bodyBytes)
+		if strings.Contains(bodyStr, `"parentFileId":"root"`) || strings.Contains(bodyStr, `"parentFileId":"/"`) {
+			respBody = `{"code": "0", "success": true, "data": {"items": [{"fileId": "139_exist_dir", "name": "139已有目录", "type": "folder", "category": "folder", "size": 0, "updatedAt": "2024-04-20 12:00:00"}]}}`
+		} else if strings.Contains(bodyStr, `"parentFileId":"139_exist_dir"`) {
+			respBody = `{"code": "0", "success": true, "data": {"items": [{"fileId": "139_new_folder", "name": "139_new_folder", "type": "folder", "category": "folder", "size": 0, "updatedAt": "2024-04-20 12:00:01"}]}}`
+		} else {
+			respBody = `{"code": "0", "success": true, "data": {"items": []}}`
+		}
 	} else if strings.Contains(url, "personal-kd-njs.yun.139.com/hcy/file/update") {
 		respBody = `{"code": "0", "success": true}`
 	} else if strings.Contains(url, "personal-kd-njs.yun.139.com/hcy/file/create") {
-		respBody = `{"code": "0", "success": true, "data": {"fileId": "mock_dir_139", "fileName": "mock_dir"}}`
+		respBody = `{"code": "0", "success": true, "data": {"fileId": "139_new_folder", "fileName": "139_new_folder"}}`
 	}
 
 	if respBody == "" {
