@@ -29,7 +29,8 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	} else if strings.Contains(url, "pan.quark.cn/account/info") {
 		respBody = `{"code": 0, "data": {"nickname": "E2E夸克用户"}}`
 	} else if strings.Contains(url, "pan.quark.cn/1/clouddrive/member") || strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/capacity") {
-		respBody = `{"code": 0, "data": {"total_capacity": 1099511627776, "use_capacity": 549755813888, "member_type": "SVIP"}}`
+		// 同时在 root 和 data 中提供 member_type，并提供多种容量字段名以确保兼容性
+		respBody = `{"code": 0, "member_type": "SUPER_VIP", "data": {"total_capacity": 1099511627776, "used_capacity": 549755813888, "use_capacity": 549755813888, "member_type": "SUPER_VIP"}}`
 	} else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/share/sharepage/detail") {
 		// 模拟返回文件列表
 		respBody = `{"code": 0, "data": {"list": [{"fid": "file1", "file_name": "[2024.04.20] E2E测试电影.mp4", "size": 1024, "updated_at": 1612345678000, "dir": false, "share_fid_token": "mock_token_1"}, {"fid": "file2", "file_name": "readme.txt", "size": 100, "updated_at": 1612345679000, "dir": false, "share_fid_token": "mock_token_2"}]}}`
