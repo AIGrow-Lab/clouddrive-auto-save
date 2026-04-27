@@ -26,13 +26,9 @@ test.describe('任务管理：状态机与执行测试', () => {
     // 点击执行按钮
     await taskRow.getByRole('button', { name: '运行' }).click();
 
-    // 增加一个较长的等待，并尝试刷新页面以确保状态更新
-    await page.waitForTimeout(10000);
-    await page.reload();
-    
     // 验证状态变更为“SUCCESS”
     const updatedTaskRow = page.locator('tr').filter({ hasText: taskName });
-    await expect(updatedTaskRow.locator('.el-tag').filter({ hasText: 'SUCCESS' })).toBeVisible({ timeout: 20000 });
+    await expect(updatedTaskRow.locator('.el-tag').filter({ hasText: 'SUCCESS' })).toBeVisible({ timeout: 30000 });
 
     // 校验：文件是否真的被转存成功了 (通过起始文件选择器查看是否显示“已在网盘”)
     await page.getByRole('button', { name: '创建任务' }).last().click();
@@ -41,7 +37,8 @@ test.describe('任务管理：状态机与执行测试', () => {
     await page.getByLabel('分享链接').fill(shareUrl);
     await page.getByLabel('保存路径').fill('/139_exec');
     
-    // 打开起始文件选择器
+    // 等待解析接口完成（会有一次加载效果或列表更新）
+    // 我们可以通过等待“选择文件”按钮可用或直接点击它
     await page.getByRole('button', { name: '选择文件' }).click();
     const startFileDialog = page.getByRole('dialog', { name: '选择起始转存文件' });
     await expect(startFileDialog).toBeVisible();
