@@ -27,10 +27,36 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	} else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/file/rename") {
 		respBody = `{"code": 0, "message": "ok"}`
 	} else if strings.Contains(url, "pan.quark.cn/account/info") {
-		respBody = `{"code": 0, "data": {"nickname": "E2E夸克用户"}}`
+		nickname := "E2E夸克用户"
+		if strings.Contains(req.Header.Get("Cookie"), "mock_normal") {
+			nickname = "E2E普通用户"
+		} else if strings.Contains(req.Header.Get("Cookie"), "mock_overcap") {
+			nickname = "E2E超容用户"
+		} else if strings.Contains(req.Header.Get("Cookie"), "mock_svipplus") {
+			nickname = "E2E超超级会员"
+		}
+		respBody = `{"code": 0, "data": {"nickname": "` + nickname + `"}}`
 	} else if strings.Contains(url, "pan.quark.cn/1/clouddrive/member") || strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/capacity") {
-		// 同时在 root 和 data 中提供 member_type，并提供多种容量字段名以确保兼容性
-		respBody = `{"code": 0, "member_type": "SUPER_VIP", "data": {"total_capacity": 1099511627776, "used_capacity": 549755813888, "use_capacity": 549755813888, "member_type": "SUPER_VIP"}}`
+		// 根据 Cookie 动态返回会员与容量
+		memberType := "SUPER_VIP"
+		totalCap := "1099511627776" // 1TB
+		usedCap := "549755813888"   // 512GB
+
+		if strings.Contains(req.Header.Get("Cookie"), "mock_normal") {
+			memberType = "NORMAL"
+			totalCap = "10737418240" // 10GB
+			usedCap = "1073741824"   // 1GB
+		} else if strings.Contains(req.Header.Get("Cookie"), "mock_overcap") {
+			memberType = "SUPER_VIP"
+			totalCap = "1099511627776" // 1TB
+			usedCap = "2199023255552"  // 2TB (Over-capacity)
+		} else if strings.Contains(req.Header.Get("Cookie"), "mock_svipplus") {
+			memberType = "Z_VIP"
+			totalCap = "10995116277760" // 10TB
+			usedCap = "1073741824"      // 1GB
+		}
+
+		respBody = `{"code": 0, "member_type": "` + memberType + `", "data": {"total_capacity": ` + totalCap + `, "used_capacity": ` + usedCap + `, "use_capacity": ` + usedCap + `, "member_type": "` + memberType + `"}}`
 	} else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/share/sharepage/detail") {
 		// 模拟返回文件列表
 		respBody = `{"code": 0, "data": {"list": [{"fid": "file1", "file_name": "[2024.04.20] E2E测试电影.mp4", "size": 1024, "updated_at": 1612345678000, "dir": false, "share_fid_token": "mock_token_1"}, {"fid": "file2", "file_name": "readme.txt", "size": 100, "updated_at": 1612345679000, "dir": false, "share_fid_token": "mock_token_2"}]}}`
