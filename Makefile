@@ -149,7 +149,7 @@ e2e-test: build
 	PID=$$!; \
 	echo "=> Backend started with PID: $$PID"; \
 	sleep 2; \
-	cd e2e && CI=true npx playwright test; \
+	cd e2e && CI=true npx playwright test --workers=1; \
 	EXIT_CODE=$$?; \
 	echo "=> Cleaning up backend (PID: $$PID)..."; \
 	kill $$PID || true; \
