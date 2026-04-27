@@ -740,7 +740,8 @@ func (c *Cloud139) SaveLink(ctx context.Context, shareURL, extractCode, targetPa
 	}
 
 	coPathLst := []string{}
-	if coLst, ok := info["coLst"].([]interface{}); ok {
+	coLst, coLst_ok := info["coLst"].([]interface{})
+	if coLst_ok {
 		for _, item := range coLst {
 			if f, ok := item.(map[string]interface{}); ok {
 				path, _ := f["path"].(string)
@@ -752,10 +753,13 @@ func (c *Cloud139) SaveLink(ctx context.Context, shareURL, extractCode, targetPa
 				}
 			}
 		}
+	} else {
+		slog.Warn("139 SaveLink: coLst type assertion failed", "val", info["coLst"])
 	}
 
 	caPathLst := []string{}
-	if caLst, ok := info["caLst"].([]interface{}); ok {
+	caLst, caLst_ok := info["caLst"].([]interface{})
+	if caLst_ok {
 		for _, item := range caLst {
 			if f, ok := item.(map[string]interface{}); ok {
 				path, _ := f["path"].(string)
@@ -774,8 +778,11 @@ func (c *Cloud139) SaveLink(ctx context.Context, shareURL, extractCode, targetPa
 	}
 
 	if len(coPathLst) == 0 && len(caPathLst) == 0 {
+		slog.Warn("139 SaveLink: coPathLst and caPathLst are both empty", "coLst_ok", coLst_ok, "caLst_ok", caLst_ok)
 		return nil
 	}
+
+	slog.Info("139 SaveLink: preparing batch task", "co_count", len(coPathLst), "ca_count", len(caPathLst))
 
 	saveBody := map[string]interface{}{
 		"createOuterLinkBatchOprTaskReq": map[string]interface{}{

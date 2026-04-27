@@ -162,8 +162,8 @@ func (q *Quark) doRequest(ctx context.Context, method, apiURL string, query url.
 			}
 		}
 
-		// 针对 400/404 或特定错误码，打上 [Fatal] 标记以供上层阻断
-		if resp.StatusCode == 404 || resp.StatusCode == 400 {
+		// 针对 400/403/404 或特定错误码，打上 [Fatal] 标记以供上层阻断
+		if resp.StatusCode == 404 || resp.StatusCode == 400 || resp.StatusCode == 403 {
 			return nil, fmt.Errorf("[Fatal] %s", errMsg)
 		}
 		return nil, fmt.Errorf("%s", errMsg)
