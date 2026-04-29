@@ -164,7 +164,7 @@
     <el-dialog v-model="dialogVisible" :title="accountForm.id ? '编辑账号' : '添加新账号'" width="520px" destroy-on-close>
       <el-form :model="accountForm" label-position="top" ref="formRef" class="account-form">
         <el-form-item label="网盘平台" required>
-          <el-radio-group v-model="accountForm.platform">
+          <el-radio-group v-model="accountForm.platform" @change="handlePlatformChange">
             <el-radio-button label="139">移动云盘</el-radio-button>
             <el-radio-button label="quark">夸克网盘</el-radio-button>
           </el-radio-group>
@@ -268,6 +268,11 @@ const handleEdit = (row) => {
     auth_token: row.auth_token
   }
   dialogVisible.value = true
+}
+
+const handlePlatformChange = () => {
+  accountForm.value.cookie = ''
+  accountForm.value.auth_token = ''
 }
 
 const submitForm = async () => {
