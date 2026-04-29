@@ -19,7 +19,7 @@ func TestParseShare_EmptyList(t *testing.T) {
 		Platform: "quark",
 		Cookie:   "mock_normal",
 	}
-	
+
 	client := NewQuark(account)
 
 	// mock_empty: 会触发我们在 mock_http 中预设的返回空列表的响应
@@ -27,7 +27,7 @@ func TestParseShare_EmptyList(t *testing.T) {
 	extractCode := ""
 
 	files, err := client.ParseShare(context.Background(), shareURL, extractCode)
-	
+
 	if err == nil {
 		t.Fatalf("expected error for empty share list, got nil. files: %v", files)
 	}
