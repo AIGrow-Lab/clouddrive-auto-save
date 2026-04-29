@@ -524,6 +524,12 @@ func (q *Quark) getStoken(ctx context.Context, pwdID, extractCode string) (strin
 	codeStr := fmt.Sprintf("%v", tokenRes.Code)
 	if codeStr != "0" && codeStr != "0.0" {
 		slog.Error("获取夸克 Stoken 失败", "code", tokenRes.Code)
+		if codeStr == "41008" {
+			return "", fmt.Errorf("[Fatal] 当前分享链接需要提取码，请填写提取码 (code: 41008)")
+		}
+		if codeStr == "41007" || codeStr == "24000" || codeStr == "41009" {
+			return "", fmt.Errorf("[Fatal] 提取码错误，请检查后再试 (code: %s)", codeStr)
+		}
 		return "", fmt.Errorf("Quark token error: %v", tokenRes.Code)
 	}
 	return tokenRes.Data.Stoken, nil

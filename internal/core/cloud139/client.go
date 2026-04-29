@@ -923,7 +923,16 @@ func (c *Cloud139) getShareInfo(ctx context.Context, linkID, passwd, pCaID strin
 	}
 
 	if code, ok := res["code"]; ok {
-		codeStr := fmt.Sprintf("%v", code)
+		var codeStr string
+		switch v := code.(type) {
+		case float64:
+			codeStr = strconv.FormatFloat(v, 'f', -1, 64)
+		case string:
+			codeStr = v
+		default:
+			codeStr = fmt.Sprintf("%v", code)
+		}
+
 		if codeStr != "0" && codeStr != "0000" && codeStr != "" {
 			slog.Error("139 分享接口返回错误码", "code", codeStr, "message", res["message"])
 
@@ -932,13 +941,18 @@ func (c *Cloud139) getShareInfo(ctx context.Context, linkID, passwd, pCaID strin
 				"200000727": "分享链接不存在或已被取消。",
 				"200000728": "提取码错误，请检查后再试。",
 				"200000732": "该分享链接已超过有效期。",
+				"9188":      "提取码错误或未提供提取码，请检查后再试。",
 			}
 
 			if friendlyMsg, ok := errorMap[codeStr]; ok {
 				return nil, fmt.Errorf("[Fatal] %s", friendlyMsg)
 			}
-			// 其余错误降级为普通 error
-			return nil, fmt.Errorf("%v", res["message"])
+			// 其余错误降级为普通 error，防止 res["message"] 为 nil 导致报错为 <nil>
+			msg, _ := res["message"].(string)
+			if msg == "" {
+				msg = fmt.Sprintf("未知业务错误 (错误码: %s)", codeStr)
+			}
+			return nil, fmt.Errorf("%s", msg)
 		}
 	}
 
