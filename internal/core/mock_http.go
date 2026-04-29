@@ -87,14 +87,15 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			respBody = `{"code": 0, "member_type": "` + memberType + `", "data": {"total_capacity": ` + totalCap + `, "used_capacity": ` + usedCap + `, "use_capacity": ` + usedCap + `, "member_type": "` + memberType + `"}}`
 		}
 	} else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/share/sharepage/detail") {
-		if strings.Contains(url, "mock_violation") {
-			statusCode = 403
-			respBody = `{"code": 41010, "message": "该分享文件涉及违规内容，已被官方屏蔽。"}`
-		} else if strings.Contains(url, "mock_invalid") {
-			statusCode = 404
-			respBody = `{"code": 24001, "message": "该分享已失效，可能已被取消或删除。"}`
-		} else if strings.Contains(url, "mock_quark_missing_code") {
-			respBody = `{"code": 41008, "message": "请先输入提取码"}`
+	if strings.Contains(url, "mock_violation") {
+		statusCode = 403
+		respBody = `{"code": 41010, "message": "该分享文件涉及违规内容，已被官方屏蔽。"}`
+	} else if strings.Contains(url, "mock_invalid") {
+		statusCode = 404
+		respBody = `{"code": 24001, "message": "该分享已失效，可能已被取消或删除。"}`
+	} else if strings.Contains(url, "mock_empty") {
+		respBody = `{"code": 0, "message": "ok", "data": {"list": []}}`
+	} else if strings.Contains(url, "mock_quark_missing_code") {			respBody = `{"code": 41008, "message": "请先输入提取码"}`
 		} else if strings.Contains(url, "mock_quark_wrong_code") {
 			respBody = `{"code": 41007, "message": "提取码错误"}`
 		} else {

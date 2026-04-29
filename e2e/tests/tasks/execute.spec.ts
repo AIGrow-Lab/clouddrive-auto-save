@@ -209,4 +209,28 @@ test.describe('任务管理：状态机与执行测试', () => {
     await errorTag.hover();
     await expect(page.getByText('提取码错误，请检查后再试 (code: 41007)')).toBeVisible();
   });
+
+  test('夸克网盘：验证分享内容为空或已失效场景', async ({ page }) => {
+    const taskName = `Quark_空分享_${Date.now()}`;
+    await page.goto('/tasks');
+    await page.getByRole('button', { name: '创建任务' }).last().click();
+    await page.locator('.el-select').first().click();
+    await page.getByRole('option', { name: 'E2E夸克用户' }).first().click();
+    await page.getByLabel('任务名称').fill(taskName);
+    await page.getByLabel('分享链接').fill('https://pan.quark.cn/s/mock_empty');
+    await page.getByRole('button', { name: '确认并保存' }).click();
+    
+    const taskRow = page.locator('tr').filter({ hasText: taskName });
+    await taskRow.getByRole('button', { name: '运行' }).click();
+
+    await page.waitForTimeout(5000);
+    await page.reload();
+
+    const updatedTaskRow = page.locator('tr').filter({ hasText: taskName });
+    const errorTag = updatedTaskRow.locator('.el-tag--danger').filter({ hasText: 'LINK ERROR' });
+    await expect(errorTag).toBeVisible({ timeout: 15000 });
+    
+    await errorTag.hover();
+    await expect(page.getByText('夸克分享链接无效、已取消或包含的文件为空')).toBeVisible();
+  });
 });
