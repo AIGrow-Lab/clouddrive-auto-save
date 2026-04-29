@@ -137,7 +137,10 @@ const handleTestBark = async () => {
   }
   testing.value = true
   try {
-    await testBark()
+    await testBark({
+      bark_server: settings.value.bark_server,
+      bark_device_key: settings.value.bark_device_key
+    })
     ElMessage.success('测试消息已发送，请检查手机')
   } catch (error) {
     ElMessage.error('测试发送失败: ' + (error.response?.data?.error || error.message))

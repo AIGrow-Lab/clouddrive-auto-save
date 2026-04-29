@@ -97,9 +97,10 @@ export function updateGlobalSettings(data) {
   })
 }
 
-export function testBark() {
+export function testBark(data) {
   return request({
     url: '/settings/test_bark',
-    method: 'post'
+    method: 'post',
+    data
   })
 }
