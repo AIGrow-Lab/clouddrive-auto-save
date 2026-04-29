@@ -46,6 +46,9 @@ dev-server:
 build-web:
 	@echo "=> Building frontend..."
 	cd $(WEB_DIR) && npm install && npm run build
+	@echo "=> Copying frontend to internal/api/dist for embedding..."
+	rm -rf internal/api/dist
+	cp -r $(WEB_DIR)/dist internal/api/dist
 
 ## build-server: 编译 Go 后端，并将前端资源内嵌 (依赖 build-web)
 build-server: build-web

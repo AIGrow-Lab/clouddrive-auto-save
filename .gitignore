@@ -35,6 +35,7 @@ pnpm-debug.log*
 web/dist/
 web/dist-ssr/
 web/*.local
+internal/api/dist/
 
 # Local Data & Database
 data/
