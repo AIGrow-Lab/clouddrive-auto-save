@@ -10,9 +10,10 @@
 
 ---
 
-### 任务 1: 提交 Playwright 配置修复
+## 任务 1: 提交 Playwright 配置修复
 
 **涉及文件：**
+
 - 修改：`e2e/playwright.config.ts`
 
 - [ ] **步骤 1: 提交配置**
@@ -22,9 +23,10 @@ git add e2e/playwright.config.ts
 git commit -m "test(e2e): 修复无效的 playwright reporter 配置"
 ```
 
-### 任务 2: 提交动态 Mock 数据及 E2E 测试用例
+## 任务 2: 提交动态 Mock 数据及 E2E 测试用例
 
 **涉及文件：**
+
 - 修改：`internal/core/mock_http.go`
 - 修改：`e2e/fixtures/account.fixture.ts`
 - 修改：`e2e/tests/accounts/quark.spec.ts`
@@ -36,9 +38,10 @@ git add e2e/fixtures/account.fixture.ts internal/core/mock_http.go e2e/tests/acc
 git commit -m "test(e2e): 增加针对夸克各种会员级别及超容状态的动态 Mock 及测试用例"
 ```
 
-### 任务 3: 提交实施计划文档
+## 任务 3: 提交实施计划文档
 
 **涉及文件：**
+
 - 修改：`conductor/account-e2e-real-interaction-plan.md`
 
 - [ ] **步骤 1: 提交文档**
@@ -48,7 +51,7 @@ git add conductor/account-e2e-real-interaction-plan.md
 git commit -m "docs: 更新夸克网盘 E2E 测试覆盖范围扩展的实施计划"
 ```
 
-### 任务 4: 推送代码到远程仓库
+## 任务 4: 推送代码到远程仓库
 
 **涉及文件：** 无
 

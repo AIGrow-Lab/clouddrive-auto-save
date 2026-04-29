@@ -4,7 +4,8 @@
 
 **Goal:** Expand the E2E test coverage for Quark accounts to include various member types (Normal, Over-capacity) by making the HTTP mock dynamic based on cookie parameters.
 
-**Architecture:** 
+**Architecture:**
+
 1. Parameterize `addQuarkAccount` in `account.fixture.ts` to accept a custom cookie string and username prefix.
 2. Modify `mock_http.go` to parse the incoming Cookie header (or `kps` for the app route) to return dynamic member and capacity JSON payloads.
 3. Add new test cases to `quark.spec.ts` for Normal users and Over-capacity users, asserting the correct display names and sizes.
@@ -13,9 +14,10 @@
 
 ---
 
-### Task 1: Refactor Quark E2E Fixture
+## Task 1: Refactor Quark E2E Fixture
 
 **Files:**
+
 - Modify: `e2e/fixtures/account.fixture.ts`
 
 - [ ] **Step 1: Write the minimal implementation**
@@ -34,54 +36,56 @@ export async function addQuarkAccount(page: Page, cookieStr: string = '__uid=moc
 }
 ```
 
-### Task 2: Implement Dynamic HTTP Mocks for Quark
+## Task 2: Implement Dynamic HTTP Mocks for Quark
 
 **Files:**
+
 - Modify: `internal/core/mock_http.go`
 
 - [ ] **Step 1: Write the minimal implementation**
 
 ```go
 // Replace the quark info/member sections in internal/core/mock_http.go
-	// 1. 模拟夸克相关接口
-	if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/share/sharepage/save") {
-		respBody = `{"code": 0, "message": "ok", "data": {"task_id": "mock_task_123"}}`
-	} else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/task") {
-		// 模拟任务成功
-		respBody = `{"code": 0, "message": "ok", "data": {"status": 2, "message": "success"}}`
-	} else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/file/rename") {
-		respBody = `{"code": 0, "message": "ok"}`
-	} else if strings.Contains(url, "pan.quark.cn/account/info") {
-		nickname := "E2E夸克用户"
-		if strings.Contains(req.Header.Get("Cookie"), "mock_normal") {
-			nickname = "E2E普通用户"
-		} else if strings.Contains(req.Header.Get("Cookie"), "mock_overcap") {
-			nickname = "E2E超容用户"
-		}
-		respBody = `{"code": 0, "data": {"nickname": "` + nickname + `"}}`
-	} else if strings.Contains(url, "pan.quark.cn/1/clouddrive/member") || strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/capacity") {
-		// 根据 Cookie 动态返回会员与容量
-		memberType := "SUPER_VIP"
-		totalCap := "1099511627776" // 1TB
-		usedCap := "549755813888"   // 512GB
+ // 1. 模拟夸克相关接口
+ if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/share/sharepage/save") {
+  respBody = `{"code": 0, "message": "ok", "data": {"task_id": "mock_task_123"}}`
+ } else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/task") {
+  // 模拟任务成功
+  respBody = `{"code": 0, "message": "ok", "data": {"status": 2, "message": "success"}}`
+ } else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/file/rename") {
+  respBody = `{"code": 0, "message": "ok"}`
+ } else if strings.Contains(url, "pan.quark.cn/account/info") {
+  nickname := "E2E夸克用户"
+  if strings.Contains(req.Header.Get("Cookie"), "mock_normal") {
+   nickname = "E2E普通用户"
+  } else if strings.Contains(req.Header.Get("Cookie"), "mock_overcap") {
+   nickname = "E2E超容用户"
+  }
+  respBody = `{"code": 0, "data": {"nickname": "` + nickname + `"}}`
+ } else if strings.Contains(url, "pan.quark.cn/1/clouddrive/member") || strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/capacity") {
+  // 根据 Cookie 动态返回会员与容量
+  memberType := "SUPER_VIP"
+  totalCap := "1099511627776" // 1TB
+  usedCap := "549755813888"   // 512GB
 
-		if strings.Contains(req.Header.Get("Cookie"), "mock_normal") {
-			memberType = "NORMAL"
-			totalCap = "10737418240" // 10GB
-			usedCap = "1073741824"   // 1GB
-		} else if strings.Contains(req.Header.Get("Cookie"), "mock_overcap") {
-			memberType = "SUPER_VIP"
-			totalCap = "1099511627776" // 1TB
-			usedCap = "2199023255552"  // 2TB (Over-capacity)
-		}
+  if strings.Contains(req.Header.Get("Cookie"), "mock_normal") {
+   memberType = "NORMAL"
+   totalCap = "10737418240" // 10GB
+   usedCap = "1073741824"   // 1GB
+  } else if strings.Contains(req.Header.Get("Cookie"), "mock_overcap") {
+   memberType = "SUPER_VIP"
+   totalCap = "1099511627776" // 1TB
+   usedCap = "2199023255552"  // 2TB (Over-capacity)
+  }
 
-		respBody = `{"code": 0, "member_type": "` + memberType + `", "data": {"total_capacity": ` + totalCap + `, "used_capacity": ` + usedCap + `, "use_capacity": ` + usedCap + `, "member_type": "` + memberType + `"}}`
-	} else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/share/sharepage/detail") {
+  respBody = `{"code": 0, "member_type": "` + memberType + `", "data": {"total_capacity": ` + totalCap + `, "used_capacity": ` + usedCap + `, "use_capacity": ` + usedCap + `, "member_type": "` + memberType + `"}}`
+ } else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/share/sharepage/detail") {
 ```
 
-### Task 3: Add Extended E2E Test Cases for Quark
+## Task 3: Add Extended E2E Test Cases for Quark
 
 **Files:**
+
 - Modify: `e2e/tests/accounts/quark.spec.ts`
 
 - [ ] **Step 1: Write the failing test / implementation**

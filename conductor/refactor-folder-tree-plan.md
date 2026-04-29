@@ -4,11 +4,12 @@
 
 **Goal:** Enhance the task creation E2E tests to interact with existing folders on the cloud drive. We will mock the file list APIs to return pre-existing directories, and have the E2E tests expand these directories and create new sub-folders inside them.
 
-**Architecture:** 
-1. **Mock HTTP Enhancement**: 
+**Architecture:**
+
+1. **Mock HTTP Enhancement**:
    - For Quark (`file/sort`), check the `pdir_fid` query parameter. If it's the root (`0`), return a list containing a folder named "夸克已有目录". Otherwise, return an empty list.
    - For 139 (`hcy/file/list`), read the request body to check `parentFileId`. If it's `root` or `/`, return a folder named "139已有目录". Otherwise, return an empty list.
-2. **E2E Test Updates**: 
+2. **E2E Test Updates**:
    - Modify `e2e/tests/tasks/create.spec.ts` so that when the "选择保存目录" dialog opens, the test clicks on the existing folder ("139已有目录" or "夸克已有目录") to select/expand it.
    - Then, input the new folder name and click "新建".
    - Verify that the resulting path is correctly nested, e.g., `/139已有目录/139_new_folder` and `/夸克已有目录/quark_new_folder`.
@@ -17,44 +18,46 @@
 
 ---
 
-### Task 1: Update HTTP Mock to Return Existing Folders
+## Task 1: Update HTTP Mock to Return Existing Folders
 
 **Files:**
+
 - Modify: `internal/core/mock_http.go`
 
 - [ ] **Step 1: Update the Quark file list mock**
 
 ```go
 // In internal/core/mock_http.go, replace the Quark file/sort mock logic:
-	} else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/file/sort") {
-		// 目标目录文件列表 (预检)
-		if strings.Contains(url, "pdir_fid=0") {
-			respBody = `{"code": 0, "data": {"list": [{"fid": "quark_exist_dir", "file_name": "夸克已有目录", "dir": true, "size": 0, "updated_at": 1612345678000}]}}`
-		} else {
-			respBody = `{"code": 0, "data": {"list": []}}`
-		}
-	} else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/file") && req.Method == "POST" {
+ } else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/file/sort") {
+  // 目标目录文件列表 (预检)
+  if strings.Contains(url, "pdir_fid=0") {
+   respBody = `{"code": 0, "data": {"list": [{"fid": "quark_exist_dir", "file_name": "夸克已有目录", "dir": true, "size": 0, "updated_at": 1612345678000}]}}`
+  } else {
+   respBody = `{"code": 0, "data": {"list": []}}`
+  }
+ } else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/file") && req.Method == "POST" {
 ```
 
 - [ ] **Step 2: Update the 139 file list mock**
 
 ```go
 // In internal/core/mock_http.go, replace the 139 hcy/file/list mock logic:
-	} else if strings.Contains(url, "personal-kd-njs.yun.139.com/hcy/file/list") {
-		bodyBytes, _ := io.ReadAll(req.Body)
-		req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-		bodyStr := string(bodyBytes)
-		if strings.Contains(bodyStr, `"parentFileId":"root"`) || strings.Contains(bodyStr, `"parentFileId":"/"`) {
-			respBody = `{"code": "0", "success": true, "data": {"items": [{"fileId": "139_exist_dir", "name": "139已有目录", "type": "folder", "category": "folder", "size": 0, "updatedAt": "2024-04-20 12:00:00"}]}}`
-		} else {
-			respBody = `{"code": "0", "success": true, "data": {"items": []}}`
-		}
-	} else if strings.Contains(url, "personal-kd-njs.yun.139.com/hcy/file/update") {
+ } else if strings.Contains(url, "personal-kd-njs.yun.139.com/hcy/file/list") {
+  bodyBytes, _ := io.ReadAll(req.Body)
+  req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+  bodyStr := string(bodyBytes)
+  if strings.Contains(bodyStr, `"parentFileId":"root"`) || strings.Contains(bodyStr, `"parentFileId":"/"`) {
+   respBody = `{"code": "0", "success": true, "data": {"items": [{"fileId": "139_exist_dir", "name": "139已有目录", "type": "folder", "category": "folder", "size": 0, "updatedAt": "2024-04-20 12:00:00"}]}}`
+  } else {
+   respBody = `{"code": "0", "success": true, "data": {"items": []}}`
+  }
+ } else if strings.Contains(url, "personal-kd-njs.yun.139.com/hcy/file/update") {
 ```
 
-### Task 2: Update E2E Create Tests for Nested Folder Creation
+## Task 2: Update E2E Create Tests for Nested Folder Creation
 
 **Files:**
+
 - Modify: `e2e/tests/tasks/create.spec.ts`
 
 - [ ] **Step 1: Update the 139 Create Task E2E Test**

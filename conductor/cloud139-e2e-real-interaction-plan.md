@@ -5,6 +5,7 @@
 **Goal:** Expand E2E test coverage for 139 accounts (移动云盘) to include various VIP tiers and capacity scenarios by adding dynamic HTTP mocks based on Authorization headers.
 
 **Architecture:**
+
 1. Parameterize `add139Account` in `account.fixture.ts` to accept custom auth tokens and usernames.
 2. Update `mock_http.go` to parse the `Authorization` header and dynamically return different nicknames, VIP levels (e.g., 普通用户, 钻石会员), and capacity data (Normal, Over-capacity).
 3. Add tests to `cloud139.spec.ts` for different member states and capacity scenarios.
@@ -13,9 +14,10 @@
 
 ---
 
-### Task 1: Parameterize 139 E2E Fixture
+## Task 1: Parameterize 139 E2E Fixture
 
 **Files:**
+
 - Modify: `e2e/fixtures/account.fixture.ts`
 
 - [ ] **Step 1: Write the minimal implementation**
@@ -35,51 +37,53 @@ export async function add139Account(page: Page, authStr: string = 'mock_auth', u
 }
 ```
 
-### Task 2: Implement Dynamic HTTP Mocks for 139
+## Task 2: Implement Dynamic HTTP Mocks for 139
 
 **Files:**
+
 - Modify: `internal/core/mock_http.go`
 
 - [ ] **Step 1: Write the minimal implementation**
 
 ```go
 // Replace the 139 mock section in internal/core/mock_http.go
-	// 2. 模拟 139 相关接口
-	if strings.Contains(url, "user-njs.yun.139.com/user/getUser") {
-		nickname := "E2E移动云盘用户"
-		if strings.Contains(req.Header.Get("Authorization"), "mock_normal") {
-			nickname = "E2E139普通用户"
-		} else if strings.Contains(req.Header.Get("Authorization"), "mock_overcap") {
-			nickname = "E2E139超容用户"
-		}
-		respBody = `{"code": "0000", "success": true, "data": {"auditNickName": "` + nickname + `", "userName": "` + nickname + `", "userDomainId": "mock_domain", "loginName": "13800000000"}}`
-	} else if strings.Contains(url, "user-njs.yun.139.com/user/disk/getPersonalDiskInfo") || strings.Contains(url, "user-njs.yun.139.com/user/disk/getFamilyDiskInfo") {
-		// 返回 MB 单位
-		diskSize := "1048576"   // 1TB (1024 * 1024 MB)
-		freeDiskSize := "524288" // 512GB (512 * 1024 MB)
-		
-		if strings.Contains(req.Header.Get("Authorization"), "mock_normal") {
-			diskSize = "20480" // 20GB
-			freeDiskSize = "10240" // 10GB
-		} else if strings.Contains(req.Header.Get("Authorization"), "mock_overcap") {
-			diskSize = "1048576" // 1TB
-			freeDiskSize = "-1048576" // -1TB -> Used: 2TB
-		}
-		respBody = `{"code": "0", "success": true, "data": {"diskSize": "` + diskSize + `", "freeDiskSize": "` + freeDiskSize + `"}}`
-	} else if strings.Contains(url, "yun.139.com/orchestration/group-rebuild/member/v1.0/queryUserBenefits") {
-		vipName := "黄金会员"
-		if strings.Contains(req.Header.Get("Authorization"), "mock_normal") {
-			vipName = "普通用户"
-		} else if strings.Contains(req.Header.Get("Authorization"), "mock_overcap") {
-			vipName = "钻石会员"
-		}
-		respBody = `{"code": "0", "success": true, "data": {"userSubMemberList": [{"memberLvName": "` + vipName + `"}]}}`
-	} else if strings.Contains(url, "share-kd-njs.yun.139.com/yun-share/richlifeApp/devapp/IOutLink/getOutLinkInfoV6") {
+ // 2. 模拟 139 相关接口
+ if strings.Contains(url, "user-njs.yun.139.com/user/getUser") {
+  nickname := "E2E移动云盘用户"
+  if strings.Contains(req.Header.Get("Authorization"), "mock_normal") {
+   nickname = "E2E139普通用户"
+  } else if strings.Contains(req.Header.Get("Authorization"), "mock_overcap") {
+   nickname = "E2E139超容用户"
+  }
+  respBody = `{"code": "0000", "success": true, "data": {"auditNickName": "` + nickname + `", "userName": "` + nickname + `", "userDomainId": "mock_domain", "loginName": "13800000000"}}`
+ } else if strings.Contains(url, "user-njs.yun.139.com/user/disk/getPersonalDiskInfo") || strings.Contains(url, "user-njs.yun.139.com/user/disk/getFamilyDiskInfo") {
+  // 返回 MB 单位
+  diskSize := "1048576"   // 1TB (1024 * 1024 MB)
+  freeDiskSize := "524288" // 512GB (512 * 1024 MB)
+  
+  if strings.Contains(req.Header.Get("Authorization"), "mock_normal") {
+   diskSize = "20480" // 20GB
+   freeDiskSize = "10240" // 10GB
+  } else if strings.Contains(req.Header.Get("Authorization"), "mock_overcap") {
+   diskSize = "1048576" // 1TB
+   freeDiskSize = "-1048576" // -1TB -> Used: 2TB
+  }
+  respBody = `{"code": "0", "success": true, "data": {"diskSize": "` + diskSize + `", "freeDiskSize": "` + freeDiskSize + `"}}`
+ } else if strings.Contains(url, "yun.139.com/orchestration/group-rebuild/member/v1.0/queryUserBenefits") {
+  vipName := "黄金会员"
+  if strings.Contains(req.Header.Get("Authorization"), "mock_normal") {
+   vipName = "普通用户"
+  } else if strings.Contains(req.Header.Get("Authorization"), "mock_overcap") {
+   vipName = "钻石会员"
+  }
+  respBody = `{"code": "0", "success": true, "data": {"userSubMemberList": [{"memberLvName": "` + vipName + `"}]}}`
+ } else if strings.Contains(url, "share-kd-njs.yun.139.com/yun-share/richlifeApp/devapp/IOutLink/getOutLinkInfoV6") {
 ```
 
-### Task 3: Add Extended E2E Test Cases for 139
+## Task 3: Add Extended E2E Test Cases for 139
 
 **Files:**
+
 - Modify: `e2e/tests/accounts/cloud139.spec.ts`
 
 - [ ] **Step 1: Write the failing test / implementation**

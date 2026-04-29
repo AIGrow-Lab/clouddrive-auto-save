@@ -4,7 +4,8 @@
 
 **Goal:** Enhance the task creation E2E tests (`create.spec.ts`) by simulating user interactions for "start file selection" and "new folder creation in save path" using realistic mock API responses.
 
-**Architecture:** 
+**Architecture:**
+
 - In `create.spec.ts`, for both 139 and Quark task creation tests, add steps to:
   1. Click "选择文件" (Choose Start File).
   2. Wait for the dialog to load the parsed share files (mocked via `parseShareLink`).
@@ -20,9 +21,10 @@
 
 ---
 
-### Task 1: Update Create Task E2E Tests
+## Task 1: Update Create Task E2E Tests
 
 **Files:**
+
 - Modify: `e2e/tests/tasks/create.spec.ts`
 
 - [ ] **Step 1: Write the updated implementation**

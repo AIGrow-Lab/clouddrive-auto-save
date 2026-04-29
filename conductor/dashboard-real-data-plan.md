@@ -10,9 +10,10 @@
 
 ---
 
-### Task 1: Implement Dashboard Overview E2E Tests
+## Task 1: Implement Dashboard Overview E2E Tests
 
 **Files:**
+
 - Modify: `e2e/tests/dashboard/overview.spec.ts`
 
 - [ ] **Step 1: Write the implementation**

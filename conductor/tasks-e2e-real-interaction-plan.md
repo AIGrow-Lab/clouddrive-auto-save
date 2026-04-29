@@ -4,7 +4,8 @@
 
 **Goal:** Provide comprehensive E2E test coverage for the Tasks module, structured by CloudDrive type (Quark and 139) and functional areas (Preview, Create, Execute), interacting with actual backend business logic and HTTP mocks.
 
-**Architecture:** 
+**Architecture:**
+
 1. **Preview (`preview.spec.ts`)**: Test the "Preview" button logic. Ensure that parsing share links for both Quark and 139 correctly retrieves file lists from the mock backend and applies renaming rules correctly.
 2. **Create (`create.spec.ts`)**: Test the task creation flow. Submit the form for both Quark and 139, ensuring the tasks are successfully created and displayed in the task list.
 3. **Execute (`execute.spec.ts`)**: Test the task execution lifecycle. Manually trigger a task execution from the list and assert that the status updates from "Running" to "Success", reflecting the backend mock responses (e.g., Quark's async task polling and 139's batch task creation).
@@ -13,9 +14,10 @@
 
 ---
 
-### Task 1: Implement Preview E2E Tests
+## Task 1: Implement Preview E2E Tests
 
 **Files:**
+
 - Modify: `e2e/tests/tasks/preview.spec.ts`
 
 - [ ] **Step 1: Write the failing test / implementation**
@@ -75,9 +77,10 @@ test.describe('任务管理：重命名预览测试', () => {
 });
 ```
 
-### Task 2: Implement Create Task E2E Tests
+## Task 2: Implement Create Task E2E Tests
 
 **Files:**
+
 - Modify: `e2e/tests/tasks/create.spec.ts`
 
 - [ ] **Step 1: Write the failing test / implementation**
@@ -129,9 +132,10 @@ test.describe('任务管理：创建功能测试', () => {
 });
 ```
 
-### Task 3: Implement Execute Task E2E Tests
+## Task 3: Implement Execute Task E2E Tests
 
 **Files:**
+
 - Modify: `e2e/tests/tasks/execute.spec.ts`
 
 - [ ] **Step 1: Write the failing test / implementation**

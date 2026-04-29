@@ -4,16 +4,18 @@
 
 ---
 
-### 问题分析 (Context)
+## 问题分析 (Context)
 
 当前的 `ci.yml` 工作流主要负责运行基础的安全扫描 (`govulncheck`) 和单元测试 (`make check`)。为了使流水线职责更加清晰，且让耗时较长的 E2E 测试能与单元测试并行运行，新建一个专门的 `e2e.yml` 工作流是最佳实践。
 
-### Task 1: 创建独立的 E2E 流水线文件
+## Task 1: 创建独立的 E2E 流水线文件
 
 **Files:**
+
 - Create: `.github/workflows/e2e.yml`
 
 **Changes:**
+
 1. 监听 `main` 分支的 `push` 和 `pull_request`，并指定只在代码或测试相关目录发生变动时触发：
    - `'**.go'`, `'go.mod'`, `'go.sum'`, `'Makefile'`
    - `'web/**'`
@@ -26,7 +28,7 @@
    - 运行 `make e2e-test` 执行端到端测试。
    - 配置 `actions/upload-artifact@v4`，在测试结束后上传 `e2e/playwright-report/` 目录，保留 7 天以便排错。
 
-### Task 2: 本地提交代码
+## Task 2: 本地提交代码
 
 - 提交新增的 `e2e.yml`。
 - 自动推送以触发 GitHub Actions。

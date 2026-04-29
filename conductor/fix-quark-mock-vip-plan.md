@@ -10,23 +10,25 @@
 
 ---
 
-### Task 1: Fix Member Type in HTTP Mock
+## Task 1: Fix Member Type in HTTP Mock
 
 **Files:**
+
 - Modify: `internal/core/mock_http.go:27-29`
 
 - [ ] **Step 1: Write the minimal implementation**
 
 ```go
 // Replace lines in internal/core/mock_http.go
-	} else if strings.Contains(url, "pan.quark.cn/1/clouddrive/member") || strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/capacity") {
-		respBody = `{"code": 0, "data": {"total_capacity": 1099511627776, "use_capacity": 549755813888, "member_type": "SUPER_VIP"}}`
-	} else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/share/sharepage/detail") {
+ } else if strings.Contains(url, "pan.quark.cn/1/clouddrive/member") || strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/capacity") {
+  respBody = `{"code": 0, "data": {"total_capacity": 1099511627776, "use_capacity": 549755813888, "member_type": "SUPER_VIP"}}`
+ } else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/share/sharepage/detail") {
 ```
 
-### Task 2: Add VIP Assertion to Quark E2E Test
+## Task 2: Add VIP Assertion to Quark E2E Test
 
 **Files:**
+
 - Modify: `e2e/tests/accounts/quark.spec.ts:6-8`
 
 - [ ] **Step 1: Write the failing test / implementation**
