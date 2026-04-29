@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/zcq/clouddrive-auto-save/internal/core"
+	"github.com/zcq/clouddrive-auto-save/internal/core/notify"
 	"github.com/zcq/clouddrive-auto-save/internal/core/renamer"
 	"github.com/zcq/clouddrive-auto-save/internal/db"
 	"github.com/zcq/clouddrive-auto-save/internal/utils"
@@ -97,7 +98,7 @@ func (m *Manager) execute(task *db.Task) {
 
 	driver := core.GetDriver(&task.Account)
 	if driver == nil {
-		m.finishTask(task, "failed", "Driver not found")
+		m.finishTask(task, "failed", "Driver not found", nil)
 		return
 	}
 
@@ -105,7 +106,7 @@ func (m *Manager) execute(task *db.Task) {
 	m.updateProgress(task, 15, "Parsing", "正在解析分享链接...")
 	files, err := driver.ParseShare(m.ctx, task.ShareURL, task.ExtractCode)
 	if err != nil {
-		m.finishTask(task, "failed", "解析分享失败: "+err.Error())
+		m.finishTask(task, "failed", "解析分享失败: "+err.Error(), nil)
 		return
 	}
 
@@ -134,13 +135,13 @@ func (m *Manager) execute(task *db.Task) {
 	m.updateProgress(task, 35, "Checking", "正在检查目标目录是否存在同名文件...")
 	targetID, err := driver.PrepareTargetPath(m.ctx, task.SavePath)
 	if err != nil {
-		m.finishTask(task, "failed", "准备目标路径失败: "+err.Error())
+		m.finishTask(task, "failed", "准备目标路径失败: "+err.Error(), nil)
 		return
 	}
 
 	existingFiles, err := driver.ListFiles(m.ctx, targetID)
 	if err != nil {
-		m.finishTask(task, "failed", "列出目标目录失败: "+err.Error())
+		m.finishTask(task, "failed", "列出目标目录失败: "+err.Error(), nil)
 		return
 	}
 
@@ -152,6 +153,7 @@ func (m *Manager) execute(task *db.Task) {
 	// 4. 计算预览名并应用过滤（正则匹配 + 智能去重）
 	processor := renamer.NewProcessor()
 	var filteredIDs []string
+	var savedFileNames []string
 	var skipCount int
 	var regexSkipCount int
 
@@ -190,6 +192,7 @@ func (m *Manager) execute(task *db.Task) {
 		}
 
 		filteredIDs = append(filteredIDs, f.ID)
+		savedFileNames = append(savedFileNames, newName)
 	}
 
 	if len(filteredIDs) == 0 {
@@ -198,14 +201,14 @@ func (m *Manager) execute(task *db.Task) {
 			msg += fmt.Sprintf(", 过滤 %d 个不匹配文件", regexSkipCount)
 		}
 		msg += ")"
-		m.finishTask(task, "success", msg)
+		m.finishTask(task, "success", msg, nil)
 		return
 	}
 
 	m.updateProgress(task, 60, "Saving", fmt.Sprintf("正在转存 %d 个文件...", len(filteredIDs)))
 	err = driver.SaveLink(m.ctx, task.ShareURL, task.ExtractCode, task.SavePath, filteredIDs)
 	if err != nil {
-		m.finishTask(task, "failed", "转存失败: "+err.Error())
+		m.finishTask(task, "failed", "转存失败: "+err.Error(), nil)
 		return
 	}
 
@@ -229,10 +232,10 @@ func (m *Manager) execute(task *db.Task) {
 		}
 	}
 
-	m.finishTask(task, "success", fmt.Sprintf("转存成功 (新增 %d 个文件, 跳过 %d 个同名文件)", len(filteredIDs), skipCount))
+	m.finishTask(task, "success", fmt.Sprintf("转存成功 (新增 %d 个文件, 跳过 %d 个同名文件)", len(filteredIDs), skipCount), savedFileNames)
 }
 
-func (m *Manager) finishTask(task *db.Task, status, message string) {
+func (m *Manager) finishTask(task *db.Task, status, message string, files []string) {
 	task.Status = status
 	task.Message = message
 	task.LastRun = time.Now()
@@ -254,4 +257,7 @@ func (m *Manager) finishTask(task *db.Task, status, message string) {
 	slog.Info(fmt.Sprintf("[PROGRESS:%d:100:%s:%s]", task.ID, task.Stage, message))
 	utils.BroadcastTaskUpdate(task)
 	utils.BroadcastStatsUpdate()
+
+	// 触发 Bark 通知
+	notify.SendTaskNotification(task.Name, status, message, files)
 }
