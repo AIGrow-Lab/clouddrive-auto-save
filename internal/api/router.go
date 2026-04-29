@@ -591,6 +591,25 @@ func updateGlobalSettings(c *gin.Context) {
 		return
 	}
 
+	// 提前检查 Cron 校验，避免在循环中重复或次序问题
+	if cronExpr, ok := input["global_schedule_cron"]; ok {
+		enabled := false
+		if e, ok := input["global_schedule_enabled"]; ok {
+			enabled = (e == "true")
+		} else {
+			var s db.Setting
+			db.DB.Where("key = ?", "global_schedule_enabled").First(&s)
+			enabled = (s.Value == "true")
+		}
+
+		if enabled && cronExpr != "" {
+			if err := scheduler.ValidateCron(cronExpr); err != nil {
+				c.PureJSON(http.StatusBadRequest, gin.H{"error": "全局 Cron 表达式格式错误: " + err.Error()})
+				return
+			}
+		}
+	}
+
 	for k, v := range input {
 		db.DB.Save(&db.Setting{Key: k, Value: v})
 		// 如果更新了定时任务配置，同步更新调度器

@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/zcq/clouddrive-auto-save/internal/core/scheduler"
 	"github.com/zcq/clouddrive-auto-save/internal/core/worker"
 	"github.com/zcq/clouddrive-auto-save/internal/db"
 	"gorm.io/driver/sqlite"
@@ -20,10 +22,11 @@ func setupTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	if err != nil {
 		t.Fatalf("failed to connect database: %v", err)
 	}
-	testDB.AutoMigrate(&db.Account{}, &db.Task{})
+	testDB.AutoMigrate(&db.Account{}, &db.Task{}, &db.Setting{})
 	db.DB = testDB // 设置全局 DB 供 handler 使用
 
 	wm := worker.NewManager(1, testDB)
+	scheduler.Init(wm)
 	r := InitRouter(wm)
 	return r, testDB
 }
@@ -130,5 +133,34 @@ func TestUpdateAccountWithWhitespace(t *testing.T) {
 	}
 	if updatedAccount.AuthToken != "new-token" {
 		t.Errorf("expected trimmed auth_token 'new-token', got '%s'", updatedAccount.AuthToken)
+	}
+}
+
+func TestUpdateGlobalSettings_InvalidCron(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r, testDB := setupTestRouter(t)
+
+	// 先开启全局调度
+	testDB.Save(&db.Setting{Key: "global_schedule_enabled", Value: "true"})
+
+	// 构造非法的 Cron 表达式请求
+	settingsData := map[string]string{
+		"global_schedule_cron": "invalid-cron",
+	}
+	body, _ := json.Marshal(settingsData)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/settings/global", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", w.Code)
+	}
+
+	var resp map[string]string
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	if !strings.Contains(resp["error"], "Cron 表达式格式错误") {
+		t.Errorf("expected cron error message, got: %s", resp["error"])
 	}
 }
