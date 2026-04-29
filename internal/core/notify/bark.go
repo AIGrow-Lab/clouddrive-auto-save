@@ -42,6 +42,18 @@ func SendBark(title, body string) error {
 		return fmt.Errorf("bark device key is empty")
 	}
 
+	return SendBarkDirect(server, key, title, body)
+}
+
+// SendBarkDirect 直接通过提供的服务器和 Key 发送推送（不检查开关）
+func SendBarkDirect(server, key, title, body string) error {
+	if server == "" {
+		server = "https://api.day.app"
+	}
+	if key == "" {
+		return fmt.Errorf("bark device key is empty")
+	}
+
 	payload := BarkPayload{
 		DeviceKey: key,
 		Title:     title,
