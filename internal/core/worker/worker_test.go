@@ -15,7 +15,9 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("failed to connect database: %v", err)
 	}
-	testDB.AutoMigrate(&db.Account{}, &db.Task{})
+	// 设置全局 DB，因为 notify 包会用到
+	db.DB = testDB
+	testDB.AutoMigrate(&db.Account{}, &db.Task{}, &db.Setting{})
 	return testDB
 }
 
