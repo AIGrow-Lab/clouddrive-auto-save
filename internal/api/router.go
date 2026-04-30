@@ -629,15 +629,38 @@ func updateGlobalSettings(c *gin.Context) {
 
 func testBarkNotification(c *gin.Context) {
 	var input struct {
-		Server string `json:"bark_server"`
-		Key    string `json:"bark_device_key"`
+		Server  string `json:"bark_server"`
+		Key     string `json:"bark_device_key"`
+		Title   string `json:"title"`
+		Body    string `json:"body"`
+		Level   string `json:"level"`
+		Sound   string `json:"sound"`
+		Icon    string `json:"icon"`
+		Archive string `json:"isArchive"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err := notify.SendBarkDirect(input.Server, input.Key, "测试通知", "这是一条来自 UCAS 的测试推送消息。")
+	title := input.Title
+	if title == "" {
+		title = "测试通知"
+	}
+	body := input.Body
+	if body == "" {
+		body = "这是一条来自 UCAS 的测试推送消息。"
+	}
+	level := input.Level
+	if level == "" {
+		level = "active"
+	}
+	sound := input.Sound
+	if sound == "" {
+		sound = "birdsong.caf"
+	}
+
+	err := notify.SendBarkDirect(input.Server, input.Key, title, body, level, sound, input.Icon, input.Archive)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
