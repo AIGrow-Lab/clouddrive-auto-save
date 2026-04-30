@@ -15,6 +15,7 @@
 3. [任务管理 (Tasks)](./tasks.md) - 转存任务的生命周期管理与手动触发。
 4. [系统设置 (Settings)](./settings.md) - **[开发中]** 全局调度规则、通知推送与 AI 配置。
 5. [数据库设计 (Database Schema)](./database.md) - 核心数据表结构与字段说明。
+6. [Bark 消息推送 (Bark API)](../bark_api.md) - 外部通知推送接口与参数说明。
 
 ## 全局响应格式
 
