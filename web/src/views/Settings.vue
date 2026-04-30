@@ -94,6 +94,15 @@
               <div class="header-title">
                 <el-icon><Bell /></el-icon>
                 <span>Bark 消息推送</span>
+                <el-link
+                  type="primary"
+                  href="https://bark.day.app/"
+                  target="_blank"
+                  :underline="false"
+                  style="margin-left: 8px; font-size: 13px;"
+                >
+                  查看教程
+                </el-link>
               </div>
               <el-switch
                 v-model="settings.bark_enabled"
