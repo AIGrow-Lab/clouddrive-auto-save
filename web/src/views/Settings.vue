@@ -19,7 +19,7 @@
                 v-model="settings.global_schedule_enabled"
                 active-value="true"
                 inactive-value="false"
-                @change="() => saveSettings(false)"
+                @change="() => saveGlobalSchedule(false)"
               />
             </div>
           </template>
@@ -77,7 +77,7 @@
               </div>
 
               <div class="form-actions">
-                <el-button type="primary" :loading="saving" @click="saveSettings(true)">
+                <el-button type="primary" :loading="savingSchedule" @click="saveGlobalSchedule(true)">
                   保存配置
                 </el-button>
               </div>
@@ -108,7 +108,7 @@
                 v-model="settings.bark_enabled"
                 active-value="true"
                 inactive-value="false"
-                @change="() => saveSettings(false)"
+                @change="() => saveBarkSettings(false)"
               />
             </div>
           </template>
@@ -128,11 +128,65 @@
                   show-password
                 />
               </el-form-item>
+
+              <!-- 高级设置折叠 -->
+              <el-collapse class="advanced-collapse">
+                <el-collapse-item name="1">
+                  <template #title>
+                    <span class="collapse-title">高级推送设置</span>
+                  </template>
+
+                  <el-form-item label="自定义图标 URL">
+                    <el-input v-model="settings.bark_icon" placeholder="https://example.com/icon.png" />
+                  </el-form-item>
+
+                  <el-form-item label="自动保存到历史记录">
+                    <el-switch v-model="settings.bark_archive" active-value="true" inactive-value="false" />
+                  </el-form-item>
+                  
+                  <el-divider content-position="left">成功通知配置</el-divider>
+                  <el-row :gutter="12">
+                    <el-col :span="12">
+                      <el-form-item label="通知级别">
+                        <el-select v-model="settings.bark_success_level" placeholder="选择级别" style="width: 100%">
+                          <el-option v-for="l in barkLevels" :key="l.value" :label="l.label" :value="l.value" />
+                        </el-select>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="12">
+                      <el-form-item label="提醒铃声">
+                        <el-select v-model="settings.bark_success_sound" placeholder="选择铃声" style="width: 100%">
+                          <el-option v-for="s in barkSounds" :key="s.value" :label="s.label" :value="s.value" />
+                        </el-select>
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+
+                  <el-divider content-position="left">失败通知配置</el-divider>
+                  <el-row :gutter="12">
+                    <el-col :span="12">
+                      <el-form-item label="通知级别">
+                        <el-select v-model="settings.bark_failure_level" placeholder="选择级别" style="width: 100%">
+                          <el-option v-for="l in barkLevels" :key="l.value" :label="l.label" :value="l.value" />
+                        </el-select>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="12">
+                      <el-form-item label="提醒铃声">
+                        <el-select v-model="settings.bark_failure_sound" placeholder="选择铃声" style="width: 100%">
+                          <el-option v-for="s in barkSounds" :key="s.value" :label="s.label" :value="s.value" />
+                        </el-select>
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+                </el-collapse-item>
+              </el-collapse>
+
               <div class="form-actions">
-                <el-button type="primary" plain @click="handleTestBark" :loading="testing" style="margin-right: 12px">
+                <el-button type="primary" plain @click="openTestDialog" :loading="testing" style="margin-right: 12px">
                   发送测试消息
                 </el-button>
-                <el-button type="primary" :loading="saving" @click="saveSettings(true)">
+                <el-button type="primary" :loading="savingBark" @click="saveBarkSettings(true)">
                   保存配置
                 </el-button>
               </div>
@@ -141,6 +195,54 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- Bark 测试对话框 -->
+    <el-dialog
+      v-model="testDialogVisible"
+      title="发送测试推送"
+      width="400px"
+      append-to-body
+      class="custom-dialog"
+    >
+      <el-form :model="testForm" label-position="top">
+        <el-form-item label="推送标题">
+          <el-input v-model="testForm.title" placeholder="输入推送标题" />
+        </el-form-item>
+        <el-form-item label="推送内容">
+          <el-input v-model="testForm.body" type="textarea" :rows="3" placeholder="输入推送内容" />
+        </el-form-item>
+        <el-row :gutter="12">
+          <el-col :span="12">
+            <el-form-item label="通知级别">
+              <el-select v-model="testForm.level" style="width: 100%">
+                <el-option v-for="l in barkLevels" :key="l.value" :label="l.label" :value="l.value" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="提醒铃声">
+              <el-select v-model="testForm.sound" style="width: 100%">
+                <el-option v-for="s in barkSounds" :key="s.value" :label="s.label" :value="s.value" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="自定义图标 URL">
+          <el-input v-model="testForm.icon" placeholder="https://example.com/icon.png" />
+        </el-form-item>
+        <el-form-item label="自动保存到历史记录">
+          <el-switch v-model="testForm.isArchive" active-value="true" inactive-value="false" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="testDialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="testing" @click="handleTestBark">
+            立即发送
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -156,15 +258,49 @@ const settings = ref({
   global_schedule_ui_mode: 'daily',
   bark_enabled: 'false',
   bark_server: 'https://api.day.app',
-  bark_device_key: ''
+  bark_device_key: '',
+  bark_success_sound: 'birdsong.caf',
+  bark_success_level: 'active',
+  bark_failure_sound: 'alarm.caf',
+  bark_failure_level: 'timeSensitive',
+  bark_archive: 'true',
+  bark_icon: ''
 })
 
 const cronMode = ref('daily')
 const dailyTime = ref(new Date(new Date().setHours(0, 0, 0, 0)))
 const testing = ref(false)
-const saving = ref(false)
+const savingSchedule = ref(false)
+const savingBark = ref(false)
 const isProcessing = ref(false)
 const pageLoading = ref(true)
+
+// Bark 可选项
+const barkLevels = [
+  { label: '活跃 (默认)', value: 'active' },
+  { label: '时效性 (专注模式可见)', value: 'timeSensitive' },
+  { label: '静默', value: 'passive' },
+  { label: '告警 (忽略静音)', value: 'critical' }
+]
+
+const barkSounds = [
+  { label: '清脆鸟鸣 (birdsong.caf)', value: 'birdsong.caf' },
+  { label: '警示音 (alarm.caf)', value: 'alarm.caf' },
+  { label: '小步舞曲 (minuet.caf)', value: 'minuet.caf' },
+  { label: '经典电铃 (bell.caf)', value: 'bell.caf' },
+  { label: '默认 (系统)', value: 'default' }
+]
+
+// 测试对话框状态
+const testDialogVisible = ref(false)
+const testForm = ref({
+  title: 'UCAS 测试通知',
+  body: '这是一条自定义参数的测试推送消息。',
+  level: 'active',
+  sound: 'birdsong.caf',
+  icon: '',
+  isArchive: 'true'
+})
 
 // 简单的 Cron 转中文描述
 const getCronDescription = (cron) => {
@@ -188,6 +324,12 @@ const fetchSettings = async () => {
     // 合并默认值
     settings.value = { ...settings.value, ...data }
     
+    // 铃声值容错处理：如果为空字符串（Bark 默认），映射为 UI 的 'default'
+    if (settings.value.bark_success_sound === '') settings.value.bark_success_sound = 'default'
+    if (settings.value.bark_failure_sound === '') settings.value.bark_failure_sound = 'default'
+    // 确保 archive 有值
+    if (settings.value.bark_archive === undefined) settings.value.bark_archive = 'true'
+
     // 优先使用持久化的 UI 模式
     if (settings.value.global_schedule_ui_mode) {
       cronMode.value = settings.value.global_schedule_ui_mode
@@ -240,25 +382,37 @@ const setPreset = (timeStr) => {
   handleTimeChange(d)
 }
 
-const saveSettings = async (manual = false) => {
+const saveGlobalSchedule = async (manual = false) => {
   if (isProcessing.value) return
   isProcessing.value = true
-  if (manual === true) saving.value = true
-  
-  // 同步当前的 UI 模式到设置对象中以进行持久化
-  settings.value.global_schedule_ui_mode = cronMode.value
+  if (manual) savingSchedule.value = true
 
+  settings.value.global_schedule_ui_mode = cronMode.value
+  
   try {
     await updateGlobalSettings(settings.value)
-    if (manual === true) {
-      ElMessage.success('设置已保存')
-    }
+    if (manual) ElMessage.success('全局调度设置已保存')
   } catch (error) {
-    const msg = error.response?.data?.error || '保存设置失败'
-    ElMessage.error({ message: msg, grouping: true })
+    ElMessage.error(error.response?.data?.error || '保存失败')
   } finally {
     isProcessing.value = false
-    saving.value = false
+    savingSchedule.value = false
+  }
+}
+
+const saveBarkSettings = async (manual = false) => {
+  if (isProcessing.value) return
+  isProcessing.value = true
+  if (manual) savingBark.value = true
+  
+  try {
+    await updateGlobalSettings(settings.value)
+    if (manual) ElMessage.success('Bark 推送设置已保存')
+  } catch (error) {
+    ElMessage.error(error.response?.data?.error || '保存失败')
+  } finally {
+    isProcessing.value = false
+    savingBark.value = false
   }
 }
 
@@ -267,18 +421,34 @@ const handleTestBark = async () => {
     ElMessage.warning('请先填写 Device Key')
     return
   }
+  
   testing.value = true
   try {
     await testBark({
       bark_server: settings.value.bark_server,
-      bark_device_key: settings.value.bark_device_key
+      bark_device_key: settings.value.bark_device_key,
+      ...testForm.value
     })
     ElMessage.success('测试消息已发送，请检查手机')
+    testDialogVisible.value = false
   } catch (error) {
     ElMessage.error('测试发送失败: ' + (error.response?.data?.error || error.message))
   } finally {
     testing.value = false
   }
+}
+
+const openTestDialog = () => {
+  if (!settings.value.bark_device_key) {
+    ElMessage.warning('请先填写 Device Key')
+    return
+  }
+  // 默认使用当前配置的值作为测试初始值
+  testForm.value.level = settings.value.bark_success_level || 'active'
+  testForm.value.sound = settings.value.bark_success_sound || 'birdsong.caf'
+  testForm.value.icon = settings.value.bark_icon || ''
+  testForm.value.isArchive = settings.value.bark_archive || 'true'
+  testDialogVisible.value = true
 }
 
 const showCronHelp = () => {
@@ -378,5 +548,35 @@ onMounted(() => {
   margin-top: 24px;
   display: flex;
   justify-content: flex-end;
+}
+
+.advanced-collapse {
+  margin-top: 20px;
+  border: none !important;
+}
+
+:deep(.advanced-collapse .el-collapse-item__header) {
+  height: 40px;
+  border-bottom: none;
+  background-color: var(--el-fill-color-light);
+  padding: 0 12px;
+  border-radius: 8px;
+}
+
+:deep(.advanced-collapse .el-collapse-item__wrap) {
+  border-bottom: none;
+  padding: 12px;
+}
+
+.collapse-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--el-text-color-secondary);
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 </style>
