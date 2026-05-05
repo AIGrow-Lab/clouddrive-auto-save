@@ -3,7 +3,7 @@
     <!-- 侧边栏 -->
     <el-aside width="240px" class="sidebar">
       <div class="logo">
-        <div class="logo-icon">U</div>
+        <CloudLogo :size="36" id="sidebar-grad" />
         <span>UCAS</span>
       </div>
       
@@ -67,6 +67,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import CloudLogo from '../components/CloudLogo.vue'
 import { useDark, useToggle } from '@vueuse/core'
 import { 
   LayoutDashboard, 
@@ -119,17 +120,6 @@ html.dark .sidebar {
   font-size: 18px;
   font-weight: 800;
   color: var(--el-color-primary);
-}
-
-.logo-icon {
-  width: 32px;
-  height: 32px;
-  background: var(--el-color-primary);
-  color: white;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .side-menu {
