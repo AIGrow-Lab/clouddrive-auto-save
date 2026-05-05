@@ -40,8 +40,15 @@ func NewBatchTracker() *BatchTracker {
 
 // RegisterBatch 注册一个新批次
 func (t *BatchTracker) RegisterBatch(batchID string, total int) {
+	if total <= 0 {
+		slog.Warn("批次任务数必须大于 0，忽略注册", "batch_id", batchID, "total", total)
+		return
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if _, exists := t.batches[batchID]; exists {
+		slog.Warn("批次 ID 已存在，将被覆盖", "batch_id", batchID)
+	}
 	t.batches[batchID] = &batchInfo{
 		total:   total,
 		count:   0,
@@ -72,11 +79,12 @@ func (t *BatchTracker) ReportTask(batchID string, result BatchResult) {
 	// 全部完成，取出结果并清理
 	results := info.results
 	totalDuration := time.Since(info.startAt)
+	onComplete := t.onComplete // 在锁内拷贝引用，避免数据竞争
 	delete(t.batches, batchID)
 	t.mu.Unlock()
 
 	slog.Info("批次全部完成", "batch_id", batchID, "total", info.total, "duration", totalDuration)
-	t.onComplete(results, totalDuration)
+	onComplete(results, totalDuration)
 }
 
 // defaultOnComplete 默认完成回调

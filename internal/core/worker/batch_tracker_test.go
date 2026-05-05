@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -66,4 +67,40 @@ func TestBatchTracker_UnknownBatch(t *testing.T) {
 	tracker.ReportTask("nonexistent", BatchResult{
 		TaskName: "ghost", Status: "success", Message: "", Duration: 0,
 	})
+}
+
+func TestBatchTracker_Concurrent(t *testing.T) {
+	tracker := NewBatchTracker()
+	batchID := "concurrent_batch"
+	total := 100
+	tracker.RegisterBatch(batchID, total)
+
+	var mu sync.Mutex
+	var callCount int
+	tracker.onComplete = func(results []BatchResult, _ time.Duration) {
+		mu.Lock()
+		callCount++
+		mu.Unlock()
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < total; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			tracker.ReportTask(batchID, BatchResult{
+				TaskName: fmt.Sprintf("task_%d", idx),
+				Status:   "success",
+				Message:  "ok",
+				Duration: time.Second,
+			})
+		}(i)
+	}
+	wg.Wait()
+
+	mu.Lock()
+	if callCount != 1 {
+		t.Errorf("expected onComplete called exactly 1 time, got %d", callCount)
+	}
+	mu.Unlock()
 }
