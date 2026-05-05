@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/zcq/clouddrive-auto-save/internal/core/notify"
 )
 
 // BatchResult 收集单个任务的执行结果
@@ -87,8 +89,17 @@ func (t *BatchTracker) ReportTask(batchID string, result BatchResult) {
 	onComplete(results, totalDuration)
 }
 
-// defaultOnComplete 默认完成回调
-// TODO: Task 2 中将对接 notify.SendBatchNotification 实现真正的汇总推送
+// defaultOnComplete 默认完成回调，将结果转换后交给 notify 包发送汇总通知
 func (t *BatchTracker) defaultOnComplete(results []BatchResult, totalDuration time.Duration) {
-	slog.Info("批次汇总（回调未对接）", "task_count", len(results), "duration", totalDuration)
+	notifyResults := make([]notify.BatchResult, len(results))
+	for i, r := range results {
+		notifyResults[i] = notify.BatchResult{
+			TaskName: r.TaskName,
+			Status:   r.Status,
+			Message:  r.Message,
+			Files:    r.Files,
+			Duration: r.Duration,
+		}
+	}
+	notify.SendBatchNotification(notifyResults, totalDuration)
 }
