@@ -1,7 +1,6 @@
 <template>
   <div class="dashboard-container">
     <div class="welcome-section">
-      <CloudLogo :size="120" style="margin-bottom: 20px" />
       <h2>欢迎回来，管理员 👋</h2>
       <p>这是您今日的云端转存概览</p>
     </div>
@@ -184,7 +183,6 @@ import {
   Loader2,
   X
 } from 'lucide-vue-next'
-import CloudLogo from '../components/CloudLogo.vue'
 import { getStats, clearLogsAPI } from '../api/dashboard'
 import { runTask, dismissTask as runDismissTask } from '../api/task'
 import { ElMessage } from 'element-plus'
