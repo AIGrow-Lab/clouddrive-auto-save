@@ -49,7 +49,7 @@ func TestManager_Execute(t *testing.T) {
 	testDB.Create(&task)
 
 	// 执行任务
-	m.execute(&task)
+	m.execute(Job{Task: &task})
 
 	// 验证结果
 	var updatedTask db.Task
@@ -87,7 +87,7 @@ func TestManager_Execute_SkipExisting(t *testing.T) {
 	}
 	testDB.Create(&task)
 
-	m.execute(&task)
+	m.execute(Job{Task: &task})
 
 	var updatedTask db.Task
 	testDB.First(&updatedTask, task.ID)
@@ -127,7 +127,7 @@ func TestManager_Execute_StartFileFilter(t *testing.T) {
 	}
 	testDB.Create(&task)
 
-	m.execute(&task)
+	m.execute(Job{Task: &task})
 
 	if spy.SaveLinkCalls == 0 {
 		t.Fatal("expected SaveLink to be called")
@@ -174,7 +174,7 @@ func TestManager_Execute_RegexFilter(t *testing.T) {
 	}
 	testDB.Create(&task)
 
-	m.execute(&task)
+	m.execute(Job{Task: &task})
 
 	if len(spy.SavedFileIDs) != 1 || spy.SavedFileIDs[0] != "f1" {
 		t.Errorf("expected only f1 (mp4) to be saved, got %v", spy.SavedFileIDs)
@@ -212,7 +212,7 @@ func TestManager_Execute_Deduplication_With_Renamer(t *testing.T) {
 	}
 	testDB.Create(&task)
 
-	m.execute(&task)
+	m.execute(Job{Task: &task})
 
 	if spy.SaveLinkCalls > 0 && len(spy.SavedFileIDs) > 0 {
 		t.Errorf("expected file to be skipped due to deduplication, but SaveLink was called with %v", spy.SavedFileIDs)
