@@ -19,10 +19,11 @@ import (
 
 // Job 代表一个待执行的转存任务
 type Job struct {
-	Task *db.Task
+	Task    *db.Task
+	BatchID string // 为空表示单任务执行
 }
 
-// Manager 负责管理 Worker 池 and 任务分发
+// Manager 负责管理 Worker 池和任务分发
 type Manager struct {
 	workers  int
 	jobQueue chan Job
@@ -30,6 +31,7 @@ type Manager struct {
 	ctx      context.Context
 	cancel   context.CancelFunc
 	db       *gorm.DB
+	tracker  *BatchTracker
 }
 
 func NewManager(numWorkers int, dbInst *gorm.DB) *Manager {
@@ -40,6 +42,7 @@ func NewManager(numWorkers int, dbInst *gorm.DB) *Manager {
 		ctx:      ctx,
 		cancel:   cancel,
 		db:       dbInst,
+		tracker:  NewBatchTracker(),
 	}
 }
 
@@ -62,6 +65,11 @@ func (m *Manager) Submit(job Job) {
 	m.jobQueue <- job
 }
 
+// RegisterBatch 注册一个批量执行批次
+func (m *Manager) RegisterBatch(batchID string, total int) {
+	m.tracker.RegisterBatch(batchID, total)
+}
+
 func (m *Manager) worker(id int) {
 	defer m.wg.Done()
 	slog.Info("Worker 启动", "id", id)
@@ -71,7 +79,7 @@ func (m *Manager) worker(id int) {
 			slog.Info("Worker 正在停止", "id", id)
 			return
 		case job := <-m.jobQueue:
-			m.execute(job.Task)
+			m.execute(job)
 		}
 	}
 }
@@ -89,7 +97,8 @@ func (m *Manager) updateProgress(task *db.Task, percent int, stage, message stri
 	utils.BroadcastTaskUpdate(task)
 }
 
-func (m *Manager) execute(task *db.Task) {
+func (m *Manager) execute(job Job) {
+	task := job.Task
 	startTime := time.Now()
 	slog.Info("正在执行任务", "name", task.Name, "id", task.ID)
 	m.updateProgress(task, 5, "Started", "任务已进入执行队列")
@@ -99,7 +108,7 @@ func (m *Manager) execute(task *db.Task) {
 
 	driver := core.GetDriver(&task.Account)
 	if driver == nil {
-		m.finishTask(task, "failed", "Driver not found", nil, startTime)
+		m.finishTask(job, "failed", "Driver not found", nil, startTime)
 		return
 	}
 
@@ -107,7 +116,7 @@ func (m *Manager) execute(task *db.Task) {
 	m.updateProgress(task, 15, "Parsing", "正在解析分享链接...")
 	files, err := driver.ParseShare(m.ctx, task.ShareURL, task.ExtractCode)
 	if err != nil {
-		m.finishTask(task, "failed", "解析分享失败: "+err.Error(), nil, startTime)
+		m.finishTask(job, "failed", "解析分享失败: "+err.Error(), nil, startTime)
 		return
 	}
 
@@ -136,13 +145,13 @@ func (m *Manager) execute(task *db.Task) {
 	m.updateProgress(task, 35, "Checking", "正在检查目标目录是否存在同名文件...")
 	targetID, err := driver.PrepareTargetPath(m.ctx, task.SavePath)
 	if err != nil {
-		m.finishTask(task, "failed", "准备目标路径失败: "+err.Error(), nil, startTime)
+		m.finishTask(job, "failed", "准备目标路径失败: "+err.Error(), nil, startTime)
 		return
 	}
 
 	existingFiles, err := driver.ListFiles(m.ctx, targetID)
 	if err != nil {
-		m.finishTask(task, "failed", "列出目标目录失败: "+err.Error(), nil, startTime)
+		m.finishTask(job, "failed", "列出目标目录失败: "+err.Error(), nil, startTime)
 		return
 	}
 
@@ -202,14 +211,14 @@ func (m *Manager) execute(task *db.Task) {
 			msg += fmt.Sprintf(", 过滤 %d 个不匹配文件", regexSkipCount)
 		}
 		msg += ")"
-		m.finishTask(task, "success", msg, nil, startTime)
+		m.finishTask(job, "success", msg, nil, startTime)
 		return
 	}
 
 	m.updateProgress(task, 60, "Saving", fmt.Sprintf("正在转存 %d 个文件...", len(filteredIDs)))
 	err = driver.SaveLink(m.ctx, task.ShareURL, task.ExtractCode, task.SavePath, filteredIDs)
 	if err != nil {
-		m.finishTask(task, "failed", "转存失败: "+err.Error(), nil, startTime)
+		m.finishTask(job, "failed", "转存失败: "+err.Error(), nil, startTime)
 		return
 	}
 
@@ -233,10 +242,11 @@ func (m *Manager) execute(task *db.Task) {
 		}
 	}
 
-	m.finishTask(task, "success", fmt.Sprintf("转存成功 (新增 %d 个文件, 跳过 %d 个同名文件)", len(filteredIDs), skipCount), savedFileNames, startTime)
+	m.finishTask(job, "success", fmt.Sprintf("转存成功 (新增 %d 个文件, 跳过 %d 个同名文件)", len(filteredIDs), skipCount), savedFileNames, startTime)
 }
 
-func (m *Manager) finishTask(task *db.Task, status, message string, files []string, startTime time.Time) {
+func (m *Manager) finishTask(job Job, status, message string, files []string, startTime time.Time) {
+	task := job.Task
 	task.Status = status
 	task.Message = message
 	task.LastRun = time.Now()
@@ -261,6 +271,13 @@ func (m *Manager) finishTask(task *db.Task, status, message string, files []stri
 	utils.BroadcastTaskUpdate(task)
 	utils.BroadcastStatsUpdate()
 
-	// 触发 Bark 通知
-	notify.SendTaskNotification(task.Name, status, message, files, duration)
+	// Bark 通知：区分单任务和批量模式
+	if job.BatchID != "" {
+		m.tracker.ReportTask(job.BatchID, BatchResult{
+			TaskName: task.Name, Status: status,
+			Message: message, Files: files, Duration: duration,
+		})
+	} else {
+		notify.SendTaskNotification(task.Name, status, message, files, duration)
+	}
 }

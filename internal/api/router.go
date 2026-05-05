@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log/slog"
@@ -413,10 +415,20 @@ func runAllTasks(c *gin.Context) {
 		return
 	}
 
+	if len(tasks) == 0 {
+		c.PureJSON(http.StatusOK, gin.H{"message": "没有可执行的任务", "count": 0})
+		return
+	}
+
+	// 生成批次 ID（时间戳 + 随机后缀，确保唯一性）
+	randBytes := make([]byte, 4)
+	rand.Read(randBytes)
+	batchID := fmt.Sprintf("batch_%d_%s", time.Now().UnixMilli(), hex.EncodeToString(randBytes))
+	WorkerManager.RegisterBatch(batchID, len(tasks))
+
 	count := 0
 	for i := range tasks {
 		task := &tasks[i]
-		// 更新状态
 		task.Status = "running"
 		task.Stage = "Started"
 		db.DB.Model(task).Updates(map[string]interface{}{
@@ -425,13 +437,12 @@ func runAllTasks(c *gin.Context) {
 		})
 		utils.BroadcastTaskUpdate(task)
 
-		// 提交到工作池
-		WorkerManager.Submit(worker.Job{Task: task})
+		WorkerManager.Submit(worker.Job{Task: task, BatchID: batchID})
 		count++
 	}
 
 	utils.BroadcastStatsUpdate()
-	slog.Info("批量运行任务提交完成", "total_triggered", count)
+	slog.Info("批量运行任务提交完成", "batch_id", batchID, "total_triggered", count)
 	c.PureJSON(http.StatusOK, gin.H{"message": fmt.Sprintf("批量执行已开启，共触发 %d 个任务", count), "count": count})
 }
 
