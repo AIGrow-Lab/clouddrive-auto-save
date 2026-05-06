@@ -29,6 +29,7 @@
           <span>系统设置</span>
         </el-menu-item>
       </el-menu>
+      <SidebarFooter />
     </el-aside>
 
     <el-container>
@@ -68,6 +69,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import CloudLogo from '../components/CloudLogo.vue'
+import SidebarFooter from '../components/SidebarFooter.vue'
 import { useDark, useToggle } from '@vueuse/core'
 import { 
   LayoutDashboard, 
