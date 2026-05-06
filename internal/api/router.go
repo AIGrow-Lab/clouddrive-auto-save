@@ -32,11 +32,11 @@ var (
 	appDate    = "unknown"
 )
 
-func InitRouter(wm *worker.Manager, ver, cmt, dt string) *gin.Engine {
+func InitRouter(wm *worker.Manager, version, commit, date string) *gin.Engine {
 	WorkerManager = wm
-	appVersion = ver
-	appCommit = cmt
-	appDate = dt
+	appVersion = version
+	appCommit = commit
+	appDate = date
 	r := gin.Default()
 
 	// 基础 API 路由组

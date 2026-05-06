@@ -33,7 +33,7 @@ func main() {
 		minLevel = slog.LevelError
 	}
 	utils.InitLogger(minLevel, os.Stdout)
-	slog.Info("UCAS starting", "version", version, "commit", commit, "date", date)
+	slog.Info("UCAS starting", "version", version, "commit", commit, "date", date, "logLevel", minLevel.String())
 
 	// 1. 初始化数据库
 	dbPath := os.Getenv("DB_PATH")
