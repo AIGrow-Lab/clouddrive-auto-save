@@ -13,6 +13,13 @@ import (
 	"github.com/zcq/clouddrive-auto-save/internal/utils"
 )
 
+// 版本信息，构建时通过 -ldflags 注入
+var (
+	version = "dev"
+	commit  = "unknown"
+	date    = "unknown"
+)
+
 func main() {
 	// 0. 初始化日志系统
 	logLevelStr := strings.ToUpper(os.Getenv("LOG_LEVEL"))
@@ -26,7 +33,7 @@ func main() {
 		minLevel = slog.LevelError
 	}
 	utils.InitLogger(minLevel, os.Stdout)
-	slog.Info("Logging system initialized", "level", minLevel.String())
+	slog.Info("UCAS starting", "version", version, "commit", commit, "date", date)
 
 	// 1. 初始化数据库
 	dbPath := os.Getenv("DB_PATH")
@@ -92,7 +99,7 @@ func main() {
 		listenAddr = "0.0.0.0:8080"
 	}
 	slog.Info("Starting API server", "addr", listenAddr)
-	r := api.InitRouter(wm)
+	r := api.InitRouter(wm, version, commit, date)
 	if err := r.Run(listenAddr); err != nil {
 		slog.Error("Failed to start API server", "error", err)
 		os.Exit(1)

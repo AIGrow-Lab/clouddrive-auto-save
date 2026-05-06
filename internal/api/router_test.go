@@ -27,7 +27,7 @@ func setupTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 
 	wm := worker.NewManager(1, testDB)
 	scheduler.Init(wm)
-	r := InitRouter(wm)
+	r := InitRouter(wm, "test", "test", "test")
 	return r, testDB
 }
 

@@ -25,13 +25,25 @@ import (
 
 var WorkerManager *worker.Manager
 
-func InitRouter(wm *worker.Manager) *gin.Engine {
+// 版本信息（由 main 包通过 InitRouter 传入）
+var (
+	appVersion = "dev"
+	appCommit  = "unknown"
+	appDate    = "unknown"
+)
+
+func InitRouter(wm *worker.Manager, ver, cmt, dt string) *gin.Engine {
 	WorkerManager = wm
+	appVersion = ver
+	appCommit = cmt
+	appDate = dt
 	r := gin.Default()
 
 	// 基础 API 路由组
 	api := r.Group("/api")
 	{
+		api.GET("/version", getVersion)
+
 		api.GET("/accounts", listAccounts)
 		api.POST("/accounts", createAccount)
 		api.PUT("/accounts/:id", updateAccount)
@@ -677,4 +689,12 @@ func testBarkNotification(c *gin.Context) {
 		return
 	}
 	c.PureJSON(http.StatusOK, gin.H{"message": "test notification sent"})
+}
+
+func getVersion(c *gin.Context) {
+	c.PureJSON(http.StatusOK, gin.H{
+		"version": appVersion,
+		"commit":  appCommit,
+		"date":    appDate,
+	})
 }
