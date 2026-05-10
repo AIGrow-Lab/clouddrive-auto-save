@@ -194,6 +194,63 @@
           </div>
         </el-card>
       </el-col>
+
+      <!-- OpenList 扫描配置 -->
+      <el-col :xs="24" :lg="12">
+        <el-card class="settings-card">
+          <template #header>
+            <div class="card-header">
+              <div class="header-title">
+                <el-icon><Scan /></el-icon>
+                <span>OpenList 扫描</span>
+              </div>
+              <el-switch
+                v-model="settings.openlist_enabled"
+                active-value="true"
+                inactive-value="false"
+                @change="() => saveOpenListSettings(false)"
+              />
+            </div>
+          </template>
+          <div class="card-content">
+            <el-form label-position="top">
+              <el-form-item label="API 地址">
+                <el-input
+                  v-model="settings.openlist_api_url"
+                  placeholder="http://127.0.0.1:23541"
+                />
+              </el-form-item>
+              <el-form-item label="API Token">
+                <el-input
+                  v-model="settings.openlist_api_token"
+                  placeholder="openlist-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                  type="password"
+                  show-password
+                />
+              </el-form-item>
+
+              <div class="form-tip">
+                配置 OpenList API 信息后，转存任务完成时将自动触发扫描。也可手动点击按钮触发。
+              </div>
+
+              <div class="form-actions">
+                <el-button
+                  type="primary"
+                  plain
+                  :loading="openlistScanning"
+                  @click="handleOpenListScan"
+                  style="margin-right: 12px"
+                >
+                  手动扫描
+                </el-button>
+                <el-button type="primary" :loading="savingOpenlist" @click="saveOpenListSettings(true)">
+                  保存配置
+                </el-button>
+              </div>
+            </el-form>
+          </div>
+        </el-card>
+      </el-col>
     </el-row>
 
     <!-- Bark 测试对话框 -->
@@ -248,8 +305,8 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
-import { Calendar, Bell, Info } from 'lucide-vue-next'
-import { getGlobalSettings, updateGlobalSettings, testBark } from '../api/task'
+import { Calendar, Bell, Info, Scan } from 'lucide-vue-next'
+import { getGlobalSettings, updateGlobalSettings, testBark, triggerOpenListScan } from '../api/task'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const settings = ref({
@@ -264,7 +321,10 @@ const settings = ref({
   bark_failure_sound: 'alarm.caf',
   bark_failure_level: 'timeSensitive',
   bark_archive: 'true',
-  bark_icon: ''
+  bark_icon: '',
+  openlist_enabled: 'false',
+  openlist_api_url: '',
+  openlist_api_token: ''
 })
 
 const cronMode = ref('daily')
@@ -274,6 +334,10 @@ const savingSchedule = ref(false)
 const savingBark = ref(false)
 const isProcessing = ref(false)
 const pageLoading = ref(true)
+
+// OpenList 相关状态
+const openlistScanning = ref(false)
+const savingOpenlist = ref(false)
 
 // Bark 可选项
 const barkLevels = [
@@ -457,6 +521,34 @@ const showCronHelp = () => {
     'Cron 帮助',
     { dangerouslyUseHTMLString: true }
   )
+}
+
+const handleOpenListScan = async () => {
+  openlistScanning.value = true
+  try {
+    await triggerOpenListScan()
+    ElMessage.success('OpenList 扫描已触发')
+  } catch (error) {
+    ElMessage.error('触发扫描失败: ' + (error.response?.data?.error || error.message))
+  } finally {
+    openlistScanning.value = false
+  }
+}
+
+const saveOpenListSettings = async (manual = false) => {
+  if (isProcessing.value) return
+  isProcessing.value = true
+  if (manual) savingOpenlist.value = true
+
+  try {
+    await updateGlobalSettings(settings.value)
+    if (manual) ElMessage.success('OpenList 扫描设置已保存')
+  } catch (error) {
+    ElMessage.error(error.response?.data?.error || '保存失败')
+  } finally {
+    isProcessing.value = false
+    savingOpenlist.value = false
+  }
 }
 
 onMounted(() => {
