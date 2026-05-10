@@ -16,6 +16,7 @@
 4. [系统设置 (Settings)](./settings.md) - 全局调度规则、通知推送与 OpenList 扫描配置。
 5. [数据库设计 (Database Schema)](./database.md) - 核心数据表结构与字段说明。
 6. [Bark 消息推送 (Bark API)](../bark_api.md) - 外部通知推送接口与参数说明。
+7. [OpenList 扫描 (OpenList API)](../openlist_api.md) - 文件扫描触发接口与配置说明。
 
 ## 全局响应格式
 
