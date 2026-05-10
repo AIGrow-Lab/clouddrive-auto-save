@@ -11,6 +11,7 @@ import (
 
 	"github.com/zcq/clouddrive-auto-save/internal/core"
 	"github.com/zcq/clouddrive-auto-save/internal/core/notify"
+	"github.com/zcq/clouddrive-auto-save/internal/core/openlist"
 	"github.com/zcq/clouddrive-auto-save/internal/core/renamer"
 	"github.com/zcq/clouddrive-auto-save/internal/db"
 	"github.com/zcq/clouddrive-auto-save/internal/utils"
@@ -270,6 +271,11 @@ func (m *Manager) finishTask(job Job, status, message string, files []string, st
 	slog.Info(fmt.Sprintf("[PROGRESS:%d:100:%s:%s]", task.ID, task.Stage, message))
 	utils.BroadcastTaskUpdate(task)
 	utils.BroadcastStatsUpdate()
+
+	// OpenList 扫描触发：单任务模式且有新文件时触发
+	if job.BatchID == "" && status == "success" && len(files) > 0 {
+		openlist.GlobalScanner.OnTaskComplete(true)
+	}
 
 	// Bark 通知：区分单任务和批量模式
 	if job.BatchID != "" {

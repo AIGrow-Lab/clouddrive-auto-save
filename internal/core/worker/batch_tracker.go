@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/zcq/clouddrive-auto-save/internal/core/notify"
+	"github.com/zcq/clouddrive-auto-save/internal/core/openlist"
 )
 
 // BatchResult 收集单个任务的执行结果
@@ -58,6 +59,9 @@ func (t *BatchTracker) RegisterBatch(batchID string, total int) {
 		startAt: time.Now(),
 	}
 	slog.Info("批次已注册", "batch_id", batchID, "total", total)
+
+	// 通知 OpenList 扫描管理器批量任务开始
+	openlist.GlobalScanner.OnBatchStart(total)
 }
 
 // ReportTask 上报单个任务完成结果，当全部完成时触发汇总通知
@@ -72,6 +76,10 @@ func (t *BatchTracker) ReportTask(batchID string, result BatchResult) {
 
 	info.results = append(info.results, result)
 	info.count++
+
+	// 通知 OpenList 扫描管理器任务完成
+	hasNewContent := result.Status == "success" && len(result.Files) > 0
+	openlist.GlobalScanner.OnTaskComplete(hasNewContent)
 
 	if info.count < info.total {
 		t.mu.Unlock()
