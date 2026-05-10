@@ -16,6 +16,7 @@ import (
 	"github.com/zcq/clouddrive-auto-save/internal/core"
 	_ "github.com/zcq/clouddrive-auto-save/internal/core/cloud139"
 	"github.com/zcq/clouddrive-auto-save/internal/core/notify"
+	"github.com/zcq/clouddrive-auto-save/internal/core/openlist"
 	_ "github.com/zcq/clouddrive-auto-save/internal/core/quark"
 	"github.com/zcq/clouddrive-auto-save/internal/core/scheduler"
 	"github.com/zcq/clouddrive-auto-save/internal/core/worker"
@@ -72,6 +73,8 @@ func InitRouter(wm *worker.Manager, version, commit, date string) *gin.Engine {
 		api.GET("/settings/global", getGlobalSettings)
 		api.POST("/settings/global", updateGlobalSettings)
 		api.POST("/settings/test_bark", testBarkNotification)
+
+		api.POST("/openlist/scan", triggerOpenListScan)
 	}
 
 	// 静态资源处理
@@ -697,4 +700,22 @@ func getVersion(c *gin.Context) {
 		"commit":  appCommit,
 		"date":    appDate,
 	})
+}
+
+func triggerOpenListScan(c *gin.Context) {
+	// 重新加载配置
+	if err := openlist.GlobalScanner.ReloadConfig(); err != nil {
+		c.PureJSON(http.StatusInternalServerError, gin.H{"error": "加载 OpenList 配置失败"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	if err := openlist.GlobalScanner.ScanNow(ctx); err != nil {
+		c.PureJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.PureJSON(http.StatusOK, gin.H{"message": "扫描已触发"})
 }
