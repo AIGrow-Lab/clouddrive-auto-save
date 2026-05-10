@@ -104,3 +104,10 @@ export function testBark(data) {
     data
   })
 }
+
+export function triggerOpenListScan() {
+  return request({
+    url: '/openlist/scan',
+    method: 'post'
+  })
+}
