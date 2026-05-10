@@ -13,7 +13,7 @@
 1. [仪表盘统计 (Dashboard)](./dashboard.md) - 系统运行状态、容量汇总与实时动态。
 2. [账号管理 (Accounts)](./accounts.md) - 139/Quark 账号的增删改查与校验。
 3. [任务管理 (Tasks)](./tasks.md) - 转存任务的生命周期管理与手动触发。
-4. [系统设置 (Settings)](./settings.md) - **[开发中]** 全局调度规则、通知推送与 AI 配置。
+4. [系统设置 (Settings)](./settings.md) - 全局调度规则、通知推送与 OpenList 扫描配置。
 5. [数据库设计 (Database Schema)](./database.md) - 核心数据表结构与字段说明。
 6. [Bark 消息推送 (Bark API)](../bark_api.md) - 外部通知推送接口与参数说明。
 
