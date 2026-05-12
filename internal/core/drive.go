@@ -37,8 +37,8 @@ type CloudDrive interface {
 	DeleteFile(ctx context.Context, fileID string) error
 
 	// 分享转存相关
-	// ParseShare 解析分享链接，返回其中的文件列表
-	ParseShare(ctx context.Context, shareURL, extractCode string) ([]FileInfo, error)
+	// ParseShare 解析分享链接，返回其中的文件列表。parentID 为空时返回根目录内容。
+	ParseShare(ctx context.Context, shareURL, extractCode, parentID string) ([]FileInfo, error)
 	// PrepareTargetPath 准备目标目录，返回目标目录的 ID。如果目录不存在则创建。
 	PrepareTargetPath(ctx context.Context, path string) (string, error)
 	// RenameFile 修改文件名或目录名

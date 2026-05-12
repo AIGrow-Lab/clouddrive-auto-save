@@ -621,13 +621,18 @@ func (c *Cloud139) CreateFolder(ctx context.Context, parentID, name string) (*co
 	}, nil
 }
 
-func (c *Cloud139) ParseShare(ctx context.Context, shareURL, extractCode string) ([]core.FileInfo, error) {
+func (c *Cloud139) ParseShare(ctx context.Context, shareURL, extractCode, parentID string) ([]core.FileInfo, error) {
 	linkID, passwd, pCaID, err := c.parseShareLink(shareURL)
 	if err != nil {
 		return nil, err
 	}
 	if extractCode != "" {
 		passwd = extractCode
+	}
+
+	// 如果指定了 parentID，使用它作为 pCaID
+	if parentID != "" {
+		pCaID = parentID
 	}
 
 	info, err := c.getShareInfo(ctx, linkID, passwd, pCaID)

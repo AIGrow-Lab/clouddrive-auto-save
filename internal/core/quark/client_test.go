@@ -26,7 +26,7 @@ func TestParseShare_EmptyList(t *testing.T) {
 	shareURL := "https://pan.quark.cn/s/mock_empty"
 	extractCode := ""
 
-	files, err := client.ParseShare(context.Background(), shareURL, extractCode)
+	files, err := client.ParseShare(context.Background(), shareURL, extractCode, "")
 
 	if err == nil {
 		t.Fatalf("expected error for empty share list, got nil. files: %v", files)

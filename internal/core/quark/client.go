@@ -550,10 +550,15 @@ func (q *Quark) extractShareParams(shareURL string) (pwdID, pdirFID string) {
 	return
 }
 
-func (q *Quark) ParseShare(ctx context.Context, shareURL, extractCode string) ([]core.FileInfo, error) {
+func (q *Quark) ParseShare(ctx context.Context, shareURL, extractCode, parentID string) ([]core.FileInfo, error) {
 	pwdID, pdirFID := q.extractShareParams(shareURL)
 	if pwdID == "" {
 		return nil, fmt.Errorf("invalid quark share url: %s", shareURL)
+	}
+
+	// 如果指定了 parentID，使用它作为 pdirFID
+	if parentID != "" {
+		pdirFID = parentID
 	}
 
 	slog.Info("正在解析夸克分享链接", "pwd_id", pwdID, "pdir_fid", pdirFID)

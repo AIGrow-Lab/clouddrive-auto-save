@@ -44,7 +44,7 @@ func (m *MockDriver) DeleteFile(ctx context.Context, fileID string) error {
 	return nil
 }
 
-func (m *MockDriver) ParseShare(ctx context.Context, shareURL, extractCode string) ([]FileInfo, error) {
+func (m *MockDriver) ParseShare(ctx context.Context, shareURL, extractCode, parentID string) ([]FileInfo, error) {
 	// 模拟网络延迟
 	time.Sleep(200 * time.Millisecond)
 	if len(m.ShareFiles) > 0 {
