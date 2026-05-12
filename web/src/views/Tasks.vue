@@ -676,9 +676,30 @@ const openBrowseShareDialog = async () => {
   tempStartFileId.value = ''
   shareFiles.value = []
   breadcrumbs.value = []
-  currentParentId.value = ''
 
-  await loadShareFiles('')
+  // 根据平台确定初始目录
+  const account = accounts.value.find(acc => acc.id === form.value.account_id)
+  let initialParentId = ''
+
+  if (account?.platform === '139') {
+    // 139 平台：使用 share_parent_id 作为初始目录
+    initialParentId = form.value.share_parent_id || ''
+  } else if (account?.platform === 'quark') {
+    // 夸克平台：从 URL 中解析 pdirFID
+    const match = form.value.share_url.match(/\/s\/(\w+)#\/list\/share\/(\w+)/)
+    if (match) {
+      initialParentId = match[2] || ''
+    }
+  }
+
+  currentParentId.value = initialParentId
+
+  // 如果有初始目录，设置面包屑导航
+  if (initialParentId) {
+    breadcrumbs.value = [{ id: initialParentId, name: '当前目录' }]
+  }
+
+  await loadShareFiles(initialParentId)
 }
 
 // 加载分享文件列表（支持子目录浏览）
@@ -722,13 +743,28 @@ const enterFolder = async (folder) => {
   await loadShareFiles(folder.id)
 }
 
+// 获取初始目录 ID（根据平台）
+const getInitialDirId = () => {
+  const account = accounts.value.find(acc => acc.id === form.value.account_id)
+
+  if (account?.platform === '139') {
+    // 139 平台：使用 share_parent_id
+    return form.value.share_parent_id || ''
+  } else if (account?.platform === 'quark') {
+    // 夸克平台：从 URL 中解析 pdirFID
+    const match = form.value.share_url.match(/\/s\/(\w+)#\/list\/share\/(\w+)/)
+    return match ? (match[2] || '') : ''
+  }
+
+  return ''
+}
+
 // 点击面包屑导航
 const navigateToBreadcrumb = async (index) => {
   if (index === -1) {
     // 返回根目录
     breadcrumbs.value = []
-    // 如果有 share_parent_id，返回到该目录（作为新的根目录）
-    const rootId = form.value.share_parent_id || ''
+    const rootId = getInitialDirId()
     currentParentId.value = rootId
     isInitialDir.value = true
     await loadShareFiles(rootId)
@@ -736,9 +772,10 @@ const navigateToBreadcrumb = async (index) => {
     breadcrumbs.value = breadcrumbs.value.slice(0, index + 1)
     const navigatedId = breadcrumbs.value[index].id
     currentParentId.value = navigatedId
-    // 判断是否回到了初始目录（share_parent_id 指定的目录或真正的根目录）
-    isInitialDir.value = form.value.share_parent_id
-      ? navigatedId === form.value.share_parent_id
+    // 判断是否回到了初始目录
+    const initialDirId = getInitialDirId()
+    isInitialDir.value = initialDirId
+      ? navigatedId === initialDirId
       : breadcrumbs.value.length === 0
     await loadShareFiles(navigatedId)
   }
