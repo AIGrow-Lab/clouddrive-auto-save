@@ -686,14 +686,10 @@ const openBrowseShareDialog = async () => {
     const match = form.value.share_url.match(/\/s\/(\w+)#\/list\/share\/(\w+)/)
     if (match && match[2] && match[2] !== '0') {
       initialParentId = match[2]
-      breadcrumbs.value = [{ id: initialParentId, name: '根目录' }]
     }
   } else if (account?.platform === '139') {
     // 139 平台：使用 share_parent_id
-    if (form.value.share_parent_id) {
-      initialParentId = form.value.share_parent_id
-      breadcrumbs.value = [{ id: initialParentId, name: '根目录' }]
-    }
+    initialParentId = form.value.share_parent_id || ''
   }
 
   currentParentId.value = initialParentId
