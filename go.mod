@@ -1,6 +1,6 @@
 module github.com/zcq/clouddrive-auto-save
 
-go 1.25.0
+go 1.25.10
 
 require (
 	github.com/gin-gonic/gin v1.12.0
