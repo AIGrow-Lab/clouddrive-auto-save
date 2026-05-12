@@ -1550,15 +1550,18 @@ html.dark .task-name-cell .name {
 
 .append-divider {
   width: 1px;
-  height: 16px;
-  background: var(--el-border-color-light);
-  margin: 0 2px;
-  align-self: center;
+  height: 20px;
+  background: var(--el-border-color);
+  margin: 0 6px;
 }
 
 :deep(.el-input-group__append) {
   display: flex;
   align-items: center;
-  padding: 0 4px;
+  gap: 4px;
+}
+
+:deep(.el-input-group__append .el-button) {
+  margin-left: 0;
 }
 </style>
