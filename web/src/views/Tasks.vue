@@ -361,8 +361,8 @@
           @current-change="handleStartFileTableChange"
           @row-dblclick="handleRowDblClick"
         >
-          <!-- startFile 模式显示 radio 列 -->
-          <el-table-column v-if="browseMode === 'startFile'" width="40" align="center">
+          <!-- startFile 模式且在根目录时显示 radio 列 -->
+          <el-table-column v-if="browseMode === 'startFile' && breadcrumbs.length === 0" width="40" align="center">
             <template #default="{ row }">
               <el-radio v-if="!row.is_folder" v-model="tempStartFileId" :label="row.id" class="naked-radio"><span></span></el-radio>
             </template>
@@ -733,9 +733,9 @@ const handleStartFileTableChange = (row) => {
   }
 }
 
-// 双击行处理：文件夹进入，文件选中（仅在 startFile 模式下）
+// 双击行处理：文件夹进入，文件选中（仅在 startFile 模式的根目录下）
 const handleRowDblClick = (row) => {
-  if (browseMode.value === 'startFile' && !row.is_folder) {
+  if (browseMode.value === 'startFile' && !row.is_folder && breadcrumbs.value.length === 0) {
     tempStartFileId.value = row.id
     confirmStartFileSelection()
   }
