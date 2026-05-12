@@ -27,6 +27,17 @@ func NewScanner() *Scanner {
 	return &Scanner{}
 }
 
+// ensureConfig 确保配置已加载（用于自动扫描场景）
+func (s *Scanner) ensureConfig() {
+	s.mu.Lock()
+	needLoad := s.client == nil
+	s.mu.Unlock()
+
+	if needLoad {
+		s.ReloadConfig(false)
+	}
+}
+
 // ReloadConfig 从数据库重新加载配置
 // forceEnabled 为 true 时忽略全局开关（用于手动扫描）
 func (s *Scanner) ReloadConfig(forceEnabled bool) error {
@@ -92,10 +103,14 @@ func (s *Scanner) OnBatchStart(count int) {
 
 // OnTaskComplete 单个任务完成时调用
 func (s *Scanner) OnTaskComplete(hasNewContent bool) {
+	// 自动扫描时自动加载配置（如果尚未加载）
+	s.ensureConfig()
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.client == nil {
+		slog.Debug("OpenList 未启用或配置不完整，跳过任务完成处理")
 		return
 	}
 
