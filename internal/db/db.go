@@ -49,6 +49,7 @@ type Task struct {
 	StartDate     *time.Time `json:"start_date"`                                    // 起始日期过滤 (可选)
 	StartFileID   string     `gorm:"size:255" json:"start_file_id"`                 // 起始文件 ID (可选)
 	StartFileName string     `gorm:"size:255" json:"start_file_name"`               // 起始文件名称 (用于前端快速回显)
+	ShareParentID string     `gorm:"size:255" json:"share_parent_id"`               // 139 分享链接的目录 ID (可选)
 	LastRun       time.Time  `json:"last_run"`
 
 	NextRun time.Time `json:"next_run"`

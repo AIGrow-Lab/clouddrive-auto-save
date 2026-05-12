@@ -653,9 +653,19 @@ const openStartFileDialog = async () => {
   tempStartFileId.value = form.value.start_file_id
   shareFiles.value = []
   breadcrumbs.value = []
-  currentParentId.value = ''
 
-  await loadShareFiles('')
+  // 使用 share_parent_id 作为初始目录（139 平台）
+  const initialParentId = form.value.share_parent_id || ''
+  currentParentId.value = initialParentId
+
+  // 如果有 share_parent_id，设置面包屑导航
+  if (initialParentId) {
+    // 从 share_parent_id 中提取目录名（如果可能）
+    // 这里我们只知道 ID，不知道名称，所以显示为 "子目录"
+    breadcrumbs.value = [{ id: initialParentId, name: '已选择的目录' }]
+  }
+
+  await loadShareFiles(initialParentId)
 }
 
 // 打开浏览分享内容对话框（用于选择目录作为新的分享链接）
@@ -775,9 +785,12 @@ const confirmSelectShareUrl = () => {
       const pdirFID = currentDirId || '0'
       newUrl = `https://pan.quark.cn/s/${pwdID}#/list/share/${pdirFID}`
     }
+    // 夸克网盘不需要 share_parent_id，清空它
+    form.value.share_parent_id = ''
   } else if (account.platform === '139') {
-    // 移动云盘：URL 不变，但更新 start_file_id 为当前目录
+    // 移动云盘：URL 不变，但存储 share_parent_id
     // 139 通过 pCaID 区分目录，URL 格式不变
+    form.value.share_parent_id = currentDirId || ''
     newUrl = originalUrl
   }
 
@@ -956,19 +969,20 @@ const confirmFolderSelection = () => {
 }
 
 const openAddDialog = () => {
-  form.value = { 
-    id: null, 
-    name: '', 
-    account_id: '', 
-    share_url: '', 
-    extract_code: '', 
-    save_path: '/', 
-    pattern: '', 
-    replacement: '', 
-    start_file_id: '', 
-    start_file_name: '', 
-    cron: '', 
-    schedule_mode: 'global' 
+  form.value = {
+    id: null,
+    name: '',
+    account_id: '',
+    share_url: '',
+    extract_code: '',
+    save_path: '/',
+    pattern: '',
+    replacement: '',
+    start_file_id: '',
+    start_file_name: '',
+    share_parent_id: '',
+    cron: '',
+    schedule_mode: 'global'
   }
   shareFiles.value = []
   selectedStartFileName.value = ''
@@ -979,7 +993,7 @@ const openAddDialog = () => {
 const handleEdit = async (row) => {
   shareFiles.value = []
   
-  form.value = { 
+  form.value = {
     id: row.id,
     name: row.name,
     account_id: row.account_id,
@@ -990,6 +1004,7 @@ const handleEdit = async (row) => {
     replacement: row.replacement,
     start_file_id: row.start_file_id,
     start_file_name: row.start_file_name,
+    share_parent_id: row.share_parent_id || '',
     cron: row.cron,
     schedule_mode: row.schedule_mode || 'global'
   }
