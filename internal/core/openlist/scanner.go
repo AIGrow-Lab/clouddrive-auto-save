@@ -33,7 +33,7 @@ func (s *Scanner) ensureConfig() {
 	needLoad := s.client == nil
 	s.mu.Unlock()
 
-	if needLoad {
+	if needLoad && db.DB != nil {
 		s.ReloadConfig(false)
 	}
 }
