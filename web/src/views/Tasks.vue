@@ -152,6 +152,7 @@
                 :disabled="!form.share_url || !form.account_id"
                 @click="openBrowseShareDialog"
               />
+              <div class="append-divider"></div>
               <el-button
                 :icon="ExternalLink"
                 title="在新标签页中打开链接"
@@ -360,15 +361,9 @@
           @current-change="handleStartFileTableChange"
           @row-dblclick="handleRowDblClick"
         >
-          <el-table-column width="40" align="center">
-            <template #default="{ row }">
-              <el-radio v-model="tempStartFileId" :label="row.id" class="naked-radio"><span></span></el-radio>
-            </template>
-          </el-table-column>
-
           <el-table-column label="原始文件名" show-overflow-tooltip min-width="180">
             <template #default="{ row }">
-              <div class="name-main" :class="{ 'folder-clickable': row.is_folder }" @dblclick="row.is_folder && enterFolder(row)">
+              <div class="name-main" :class="{ 'folder-clickable': row.is_folder }" @click="row.is_folder && enterFolder(row)" @dblclick="!row.is_folder && handleRowDblClick(row)">
                 <el-icon size="16">
                   <Folder v-if="row.is_folder" color="#eab308" />
                   <File v-else color="#64748b" />
@@ -405,26 +400,18 @@
           </el-table-column>
 
           <el-table-column prop="updated_at" label="分享更新时间" width="160" sortable />
-
-          <el-table-column label="操作" width="80" align="center">
-            <template #default="{ row }">
-              <el-button v-if="row.is_folder" type="primary" link size="small" @click="enterFolder(row)">
-                进入
-              </el-button>
-            </template>
-          </el-table-column>
         </el-table>
       </div>
       <template #footer>
         <el-button @click="startFileDialogVisible = false">取消</el-button>
         <template v-if="browseMode === 'selectShareUrl'">
-          <el-button type="primary" @click="confirmSelectShareUrl" :disabled="!tempStartFileId">
-            选择为分享链接
+          <el-button type="primary" @click="confirmSelectShareUrl">
+            选择当前目录（{{ currentDirName }}）
           </el-button>
         </template>
         <template v-else>
           <el-button @click="clearStartFile">清除选择</el-button>
-          <el-button type="primary" @click="confirmStartFileSelection">确认选择</el-button>
+          <el-button type="primary" @click="confirmStartFileSelection" :disabled="!tempStartFileId">确认选择</el-button>
         </template>
       </template>
     </el-dialog>
@@ -529,6 +516,14 @@ const tempStartFileId = ref('')
 const breadcrumbs = ref([]) // [{ id, name }]
 const currentParentId = ref('')
 const browseMode = ref('startFile') // 'startFile' | 'selectShareUrl'
+
+// 计算当前目录名称（用于 selectShareUrl 模式的按钮显示）
+const currentDirName = computed(() => {
+  if (breadcrumbs.value.length === 0) {
+    return '根目录'
+  }
+  return breadcrumbs.value[breadcrumbs.value.length - 1].name
+})
 
 // 处理表格行样式
 const tableRowClassName = ({ row }) => {
@@ -722,11 +717,9 @@ const handleStartFileTableChange = (row) => {
   }
 }
 
-// 双击行处理：文件夹进入，文件选中
+// 双击行处理：文件夹进入，文件选中（仅在 startFile 模式下）
 const handleRowDblClick = (row) => {
-  if (row.is_folder) {
-    enterFolder(row)
-  } else {
+  if (browseMode.value === 'startFile' && !row.is_folder) {
     tempStartFileId.value = row.id
     confirmStartFileSelection()
   }
@@ -746,15 +739,6 @@ const confirmStartFileSelection = () => {
 
 // 确认选择目录作为新的分享链接
 const confirmSelectShareUrl = () => {
-  if (!tempStartFileId.value) {
-    return ElMessage.warning('请先选择一个文件夹')
-  }
-
-  const selected = shareFiles.value.find(f => f.id === tempStartFileId.value)
-  if (!selected || !selected.is_folder) {
-    return ElMessage.warning('请选择一个文件夹')
-  }
-
   // 根据平台生成新的分享链接
   const account = accounts.value.find(acc => acc.id === form.value.account_id)
   if (!account) return
@@ -762,16 +746,21 @@ const confirmSelectShareUrl = () => {
   const originalUrl = form.value.share_url
   let newUrl = originalUrl
 
+  // 获取当前目录 ID（根目录时使用默认值）
+  const currentDirId = currentParentId.value || ''
+
   if (account.platform === 'quark') {
     // 夸克网盘：替换 URL 中的 pdirFID
     // 格式：https://pan.quark.cn/s/{pwdID}#/list/share/{pdirFID}
     const match = originalUrl.match(/\/s\/(\w+)/)
     if (match) {
       const pwdID = match[1]
-      newUrl = `https://pan.quark.cn/s/${pwdID}#/list/share/${selected.id}`
+      // 根目录时使用 "0"，子目录时使用 currentDirId
+      const pdirFID = currentDirId || '0'
+      newUrl = `https://pan.quark.cn/s/${pwdID}#/list/share/${pdirFID}`
     }
   } else if (account.platform === '139') {
-    // 移动云盘：URL 不变，但更新 start_file_id 为选中的文件夹
+    // 移动云盘：URL 不变，但更新 start_file_id 为当前目录
     // 139 通过 pCaID 区分目录，URL 格式不变
     newUrl = originalUrl
   }
@@ -782,7 +771,7 @@ const confirmSelectShareUrl = () => {
   form.value.start_file_name = ''
   selectedStartFileName.value = ''
 
-  ElMessage.success(`已选择目录：${selected.name}`)
+  ElMessage.success(`已选择目录：${currentDirName.value}`)
   startFileDialogVisible.value = false
 }
 
@@ -1486,5 +1475,12 @@ html.dark .task-name-cell .name {
 
 .folder-clickable:hover {
   color: var(--el-color-primary);
+}
+
+.append-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--el-border-color);
+  margin: 0 4px;
 }
 </style>
