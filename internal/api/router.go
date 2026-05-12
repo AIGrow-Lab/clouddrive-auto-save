@@ -340,6 +340,7 @@ func updateTask(c *gin.Context) {
 		"replacement":     task.Replacement,
 		"start_file_id":   task.StartFileID,
 		"start_file_name": task.StartFileName,
+		"share_parent_id": task.ShareParentID,
 		"cron":            task.Cron,
 		"schedule_mode":   task.ScheduleMode,
 	}

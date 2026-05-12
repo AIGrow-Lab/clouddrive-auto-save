@@ -361,8 +361,8 @@
           @current-change="handleStartFileTableChange"
           @row-dblclick="handleRowDblClick"
         >
-          <!-- startFile 模式且在根目录时显示 radio 列 -->
-          <el-table-column v-if="browseMode === 'startFile' && breadcrumbs.length === 0" width="40" align="center">
+          <!-- startFile 模式且在初始目录时显示 radio 列 -->
+          <el-table-column v-if="browseMode === 'startFile' && isInitialDir" width="40" align="center">
             <template #default="{ row }">
               <el-radio v-if="!row.is_folder" v-model="tempStartFileId" :label="row.id" class="naked-radio"><span></span></el-radio>
             </template>
@@ -532,6 +532,7 @@ const tempStartFileId = ref('')
 const breadcrumbs = ref([]) // [{ id, name }]
 const currentParentId = ref('')
 const browseMode = ref('startFile') // 'startFile' | 'selectShareUrl'
+const isInitialDir = ref(true) // 是否在初始目录（用于控制 radio 显示）
 
 // 计算当前目录名称（用于 selectShareUrl 模式的按钮显示）
 const currentDirName = computed(() => {
@@ -653,6 +654,7 @@ const openStartFileDialog = async () => {
   tempStartFileId.value = form.value.start_file_id
   shareFiles.value = []
   breadcrumbs.value = []
+  isInitialDir.value = true
 
   // 使用 share_parent_id 作为初始目录（139 平台）
   const initialParentId = form.value.share_parent_id || ''
@@ -722,6 +724,7 @@ const loadShareFiles = async (parentId) => {
 // 进入子目录
 const enterFolder = async (folder) => {
   breadcrumbs.value.push({ id: folder.id, name: folder.name })
+  isInitialDir.value = false
   await loadShareFiles(folder.id)
 }
 
@@ -730,10 +733,14 @@ const navigateToBreadcrumb = async (index) => {
   if (index === -1) {
     // 返回根目录
     breadcrumbs.value = []
+    isInitialDir.value = !form.value.share_parent_id
     await loadShareFiles('')
   } else {
     breadcrumbs.value = breadcrumbs.value.slice(0, index + 1)
-    await loadShareFiles(breadcrumbs.value[index].id)
+    // 判断是否回到了初始目录（share_parent_id 指定的目录）
+    const navigatedId = breadcrumbs.value[index].id
+    isInitialDir.value = form.value.share_parent_id ? navigatedId === form.value.share_parent_id : false
+    await loadShareFiles(navigatedId)
   }
 }
 
@@ -743,9 +750,9 @@ const handleStartFileTableChange = (row) => {
   }
 }
 
-// 双击行处理：文件夹进入，文件选中（仅在 startFile 模式的根目录下）
+// 双击行处理：文件夹进入，文件选中（仅在 startFile 模式的初始目录下）
 const handleRowDblClick = (row) => {
-  if (browseMode.value === 'startFile' && !row.is_folder && breadcrumbs.value.length === 0) {
+  if (browseMode.value === 'startFile' && !row.is_folder && isInitialDir.value) {
     tempStartFileId.value = row.id
     confirmStartFileSelection()
   }
