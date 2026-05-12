@@ -3,6 +3,7 @@ package openlist
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -10,6 +11,12 @@ import (
 	"strings"
 	"time"
 )
+
+// scanResponse OpenList API 响应结构
+type scanResponse struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
 
 // Client 封装 OpenList API 调用
 type Client struct {
@@ -58,6 +65,13 @@ func (c *Client) StartScan(ctx context.Context) error {
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("API 返回错误状态码 %d: %s", resp.StatusCode, string(body))
+	}
+
+	// 检查业务错误码（OpenList 返回 HTTP 200 但可能包含业务错误）
+	// code=200 或 code=0 表示成功
+	var result scanResponse
+	if err := json.Unmarshal(body, &result); err == nil && result.Code != 0 && result.Code != 200 {
+		return fmt.Errorf("API 业务错误 %d: %s", result.Code, result.Message)
 	}
 
 	return nil
