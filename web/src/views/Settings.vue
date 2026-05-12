@@ -528,8 +528,8 @@ const handleOpenListScan = async () => {
   try {
     await triggerOpenListScan()
     ElMessage.success('OpenList 扫描已触发')
-  } catch (error) {
-    ElMessage.error('触发扫描失败: ' + (error.response?.data?.error || error.message))
+  } catch {
+    // 错误由响应拦截器统一处理
   } finally {
     openlistScanning.value = false
   }

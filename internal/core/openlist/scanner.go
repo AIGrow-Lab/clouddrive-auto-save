@@ -74,7 +74,7 @@ func (s *Scanner) ScanNow(ctx context.Context) error {
 
 	slog.Info("触发 OpenList 扫描")
 	if err := client.StartScan(ctx); err != nil {
-		slog.Error("OpenList 扫描失败", "error", err)
+		slog.Warn("OpenList 扫描失败", "error", err)
 		return err
 	}
 
