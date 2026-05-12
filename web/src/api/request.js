@@ -23,8 +23,12 @@ service.interceptors.response.use(
     return res
   },
   error => {
-    // 优先从后端返回的 JSON 结构中提取 error 字段
-    const msg = error.response?.data?.error || error.message || '请求失败'
+    let msg
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      msg = '请求超时，请稍后重试'
+    } else {
+      msg = error.response?.data?.error || error.message || '请求失败'
+    }
     ElMessage({
       message: msg,
       type: 'error',
