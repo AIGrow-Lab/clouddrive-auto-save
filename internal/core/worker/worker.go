@@ -115,7 +115,7 @@ func (m *Manager) execute(job Job) {
 
 	// 2. 解析分享内容
 	m.updateProgress(task, 15, "Parsing", "正在解析分享链接...")
-	files, err := driver.ParseShare(m.ctx, task.ShareURL, task.ExtractCode)
+	files, err := driver.ParseShare(m.ctx, task.ShareURL, task.ExtractCode, "")
 	if err != nil {
 		m.finishTask(job, "failed", "解析分享失败: "+err.Error(), nil, startTime)
 		return

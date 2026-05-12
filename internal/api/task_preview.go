@@ -17,6 +17,7 @@ func previewTask(c *gin.Context) {
 		AccountID   uint   `json:"account_id"`
 		ShareURL    string `json:"share_url"`
 		ExtractCode string `json:"extract_code"`
+		ParentID    string `json:"parent_id"`
 		SavePath    string `json:"save_path"`
 		Pattern     string `json:"pattern"`
 		Replacement string `json:"replacement"`
@@ -40,7 +41,7 @@ func previewTask(c *gin.Context) {
 	}
 
 	// 1. 获取分享内容
-	files, err := driver.ParseShare(c.Request.Context(), req.ShareURL, req.ExtractCode)
+	files, err := driver.ParseShare(c.Request.Context(), req.ShareURL, req.ExtractCode, req.ParentID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Parse share failed: " + err.Error()})
 		return
@@ -117,6 +118,7 @@ func parseShareLinkInfo(c *gin.Context) {
 		AccountID   uint   `json:"account_id"`
 		ShareURL    string `json:"share_url"`
 		ExtractCode string `json:"extract_code"`
+		ParentID    string `json:"parent_id"`
 		SavePath    string `json:"save_path"`
 		Pattern     string `json:"pattern"`
 		Replacement string `json:"replacement"`
@@ -127,7 +129,7 @@ func parseShareLinkInfo(c *gin.Context) {
 		return
 	}
 
-	slog.Info("正在解析分享链接", "url", req.ShareURL, "account_id", req.AccountID, "save_path", req.SavePath)
+	slog.Info("正在解析分享链接", "url", req.ShareURL, "account_id", req.AccountID, "parent_id", req.ParentID, "save_path", req.SavePath)
 
 	var account db.Account
 	if err := db.DB.First(&account, req.AccountID).Error; err != nil {
@@ -144,7 +146,7 @@ func parseShareLinkInfo(c *gin.Context) {
 	}
 
 	// 1. 获取分享内容
-	files, err := driver.ParseShare(c.Request.Context(), req.ShareURL, req.ExtractCode)
+	files, err := driver.ParseShare(c.Request.Context(), req.ShareURL, req.ExtractCode, req.ParentID)
 	if err != nil {
 		slog.Error("解析失败", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

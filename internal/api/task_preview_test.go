@@ -31,7 +31,7 @@ func (m *apiMockDriver) CreateFolder(ctx context.Context, p, n string) (*core.Fi
 	return &core.FileInfo{ID: "dir1", Name: n}, nil
 }
 func (m *apiMockDriver) DeleteFile(ctx context.Context, id string) error { return nil }
-func (m *apiMockDriver) ParseShare(ctx context.Context, u, p string) ([]core.FileInfo, error) {
+func (m *apiMockDriver) ParseShare(ctx context.Context, u, p, parentID string) ([]core.FileInfo, error) {
 	return m.Files, nil
 }
 func (m *apiMockDriver) SaveLink(ctx context.Context, u, p, t string, ids []string) error { return nil }
