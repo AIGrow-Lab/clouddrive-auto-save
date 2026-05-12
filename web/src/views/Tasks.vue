@@ -657,15 +657,9 @@ const openStartFileDialog = async () => {
   isInitialDir.value = true
 
   // 使用 share_parent_id 作为初始目录（139 平台）
+  // 如果有 share_parent_id，将其作为新的根目录
   const initialParentId = form.value.share_parent_id || ''
   currentParentId.value = initialParentId
-
-  // 如果有 share_parent_id，设置面包屑导航
-  if (initialParentId) {
-    // 从 share_parent_id 中提取目录名（如果可能）
-    // 这里我们只知道 ID，不知道名称，所以显示为 "子目录"
-    breadcrumbs.value = [{ id: initialParentId, name: '已选择的目录' }]
-  }
 
   await loadShareFiles(initialParentId)
 }
@@ -733,13 +727,19 @@ const navigateToBreadcrumb = async (index) => {
   if (index === -1) {
     // 返回根目录
     breadcrumbs.value = []
-    isInitialDir.value = !form.value.share_parent_id
-    await loadShareFiles('')
+    // 如果有 share_parent_id，返回到该目录（作为新的根目录）
+    const rootId = form.value.share_parent_id || ''
+    currentParentId.value = rootId
+    isInitialDir.value = true
+    await loadShareFiles(rootId)
   } else {
     breadcrumbs.value = breadcrumbs.value.slice(0, index + 1)
-    // 判断是否回到了初始目录（share_parent_id 指定的目录）
     const navigatedId = breadcrumbs.value[index].id
-    isInitialDir.value = form.value.share_parent_id ? navigatedId === form.value.share_parent_id : false
+    currentParentId.value = navigatedId
+    // 判断是否回到了初始目录（share_parent_id 指定的目录或真正的根目录）
+    isInitialDir.value = form.value.share_parent_id
+      ? navigatedId === form.value.share_parent_id
+      : breadcrumbs.value.length === 0
     await loadShareFiles(navigatedId)
   }
 }
