@@ -315,38 +315,51 @@
     </el-dialog>
 
     <!-- 选择起始文件独立弹窗 -->
-    <el-dialog 
-      v-model="startFileDialogVisible" 
-      title="选择起始转存文件" 
+    <el-dialog
+      v-model="startFileDialogVisible"
+      title="选择起始转存文件"
       width="900px"
       append-to-body
       destroy-on-close
     >
       <div class="share-files-dialog-content">
+        <!-- 面包屑导航 -->
+        <div class="breadcrumb-nav" style="margin-bottom: 12px;">
+          <el-breadcrumb separator="/">
+            <el-breadcrumb-item>
+              <a href="#" @click.prevent="navigateToBreadcrumb(-1)" class="breadcrumb-link">根目录</a>
+            </el-breadcrumb-item>
+            <el-breadcrumb-item v-for="(crumb, index) in breadcrumbs" :key="crumb.id">
+              <a href="#" @click.prevent="navigateToBreadcrumb(index)" class="breadcrumb-link">{{ crumb.name }}</a>
+            </el-breadcrumb-item>
+          </el-breadcrumb>
+        </div>
+
         <el-alert title="逻辑说明" type="info" :closable="false" show-icon style="margin-bottom: 15px">
-          系统将从选中的文件开始，按更新时间向前转存所有更新的文件（含所选文件本身）。<b>此处已应用您的重命名规则并执行同名预检。</b>
+          系统将从选中的文件开始，按更新时间向前转存所有更新的文件（含所选文件本身）。<b>此处已应用您的重命名规则并执行同名预检。</b> 点击文件夹可进入子目录。
         </el-alert>
-        
-        <el-table 
-          :data="shareFiles" 
-          max-height="500" 
-          size="default" 
-          border 
-          stripe 
+
+        <el-table
+          :data="shareFiles"
+          max-height="500"
+          size="default"
+          border
+          stripe
           v-loading="parsingShare"
           highlight-current-row
           :row-class-name="tableRowClassName"
           @current-change="handleStartFileTableChange"
+          @row-dblclick="handleRowDblClick"
         >
           <el-table-column width="40" align="center">
             <template #default="{ row }">
               <el-radio v-model="tempStartFileId" :label="row.id" class="naked-radio"><span></span></el-radio>
             </template>
           </el-table-column>
-          
+
           <el-table-column label="原始文件名" show-overflow-tooltip min-width="180">
             <template #default="{ row }">
-              <div class="name-main">
+              <div class="name-main" :class="{ 'folder-clickable': row.is_folder }" @dblclick="row.is_folder && enterFolder(row)">
                 <el-icon size="16">
                   <Folder v-if="row.is_folder" color="#eab308" />
                   <File v-else color="#64748b" />
@@ -358,7 +371,7 @@
 
           <el-table-column label="预览文件名 (入库名)" show-overflow-tooltip min-width="220">
             <template #default="{ row }">
-              <span :style="{ 
+              <span :style="{
                 fontWeight: row.is_folder ? '600' : 'normal',
                 color: (row.new_name && row.new_name !== row.name) ? 'var(--el-color-primary)' : 'inherit'
               }">
@@ -374,15 +387,23 @@
               </el-tag>
             </template>
           </el-table-column>
-          
+
           <el-table-column label="状态" width="100" align="center">
             <template #default="{ row }">
               <el-tag v-if="row.is_existed" size="small" type="success" effect="light">已在网盘</el-tag>
               <el-tag v-else size="small" type="info" effect="plain">待转存</el-tag>
             </template>
           </el-table-column>
-          
+
           <el-table-column prop="updated_at" label="分享更新时间" width="160" sortable />
+
+          <el-table-column label="操作" width="80" align="center">
+            <template #default="{ row }">
+              <el-button v-if="row.is_folder" type="primary" link size="small" @click="enterFolder(row)">
+                进入
+              </el-button>
+            </template>
+          </el-table-column>
         </el-table>
       </div>
       <template #footer>
@@ -487,6 +508,10 @@ const parsingShare = ref(false)
 const startFileDialogVisible = ref(false)
 const selectedStartFileName = ref('')
 const tempStartFileId = ref('')
+
+// 子目录浏览相关
+const breadcrumbs = ref([]) // [{ id, name }]
+const currentParentId = ref('')
 
 // 处理表格行样式
 const tableRowClassName = ({ row }) => {
@@ -593,24 +618,36 @@ const openStartFileDialog = async () => {
   if (!form.value.share_url || !form.value.account_id) {
     return ElMessage.warning('请先填写执行账号和分享链接')
   }
-  
+
   startFileDialogVisible.value = true
   parsingShare.value = true
   tempStartFileId.value = form.value.start_file_id
   shareFiles.value = []
-  
+  breadcrumbs.value = []
+  currentParentId.value = ''
+
+  await loadShareFiles('')
+}
+
+// 加载分享文件列表（支持子目录浏览）
+const loadShareFiles = async (parentId) => {
+  parsingShare.value = true
+  shareFiles.value = []
+  currentParentId.value = parentId
+
   try {
     const data = await parseShareLink({
       account_id: form.value.account_id,
       share_url: form.value.share_url,
       extract_code: form.value.extract_code,
+      parent_id: parentId,
       save_path: form.value.save_path,
       pattern: form.value.pattern,
       replacement: form.value.replacement,
       name: form.value.name
     })
     shareFiles.value = data
-    
+
     // 如果已经有选中的 ID，尝试匹配出文件名用于回显
     if (form.value.start_file_id) {
       const selected = data.find(f => f.id === form.value.start_file_id)
@@ -620,16 +657,43 @@ const openStartFileDialog = async () => {
     }
   } catch (err) {
     console.error('解析链接失败:', err)
-    // 移除冗余的提示，交给全局 API 拦截器展示后端清洗后的友好报错
     startFileDialogVisible.value = false
   } finally {
     parsingShare.value = false
   }
 }
 
+// 进入子目录
+const enterFolder = async (folder) => {
+  breadcrumbs.value.push({ id: folder.id, name: folder.name })
+  await loadShareFiles(folder.id)
+}
+
+// 点击面包屑导航
+const navigateToBreadcrumb = async (index) => {
+  if (index === -1) {
+    // 返回根目录
+    breadcrumbs.value = []
+    await loadShareFiles('')
+  } else {
+    breadcrumbs.value = breadcrumbs.value.slice(0, index + 1)
+    await loadShareFiles(breadcrumbs.value[index].id)
+  }
+}
+
 const handleStartFileTableChange = (row) => {
   if (row) {
     tempStartFileId.value = row.id
+  }
+}
+
+// 双击行处理：文件夹进入，文件选中
+const handleRowDblClick = (row) => {
+  if (row.is_folder) {
+    enterFolder(row)
+  } else {
+    tempStartFileId.value = row.id
+    confirmStartFileSelection()
   }
 }
 
@@ -1323,5 +1387,27 @@ html.dark .task-name-cell .name {
 .acc-cap {
   font-size: 12px;
   color: #94a3b8;
+}
+
+.breadcrumb-nav {
+  padding: 8px 0;
+}
+
+.breadcrumb-link {
+  color: var(--el-color-primary);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.breadcrumb-link:hover {
+  text-decoration: underline;
+}
+
+.folder-clickable {
+  cursor: pointer;
+}
+
+.folder-clickable:hover {
+  color: var(--el-color-primary);
 }
 </style>
