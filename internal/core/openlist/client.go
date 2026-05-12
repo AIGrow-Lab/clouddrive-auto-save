@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -31,7 +32,10 @@ func NewClient(baseURL, token string) *Client {
 
 // StartScan 触发 OpenList 扫描
 func (c *Client) StartScan(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/admin/scan/start", nil)
+	url := c.baseURL + "/api/admin/scan/start"
+	slog.Debug("OpenList 发送扫描请求", "url", url)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
 	if err != nil {
 		return fmt.Errorf("创建请求失败: %w", err)
 	}
@@ -47,8 +51,12 @@ func (c *Client) StartScan(ctx context.Context) error {
 	}
 	defer resp.Body.Close()
 
+	body, _ := io.ReadAll(resp.Body)
+	slog.Debug("OpenList 扫描响应",
+		"status", resp.StatusCode,
+		"body", string(body))
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("API 返回错误状态码 %d: %s", resp.StatusCode, string(body))
 	}
 
