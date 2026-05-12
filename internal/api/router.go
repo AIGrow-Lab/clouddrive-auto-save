@@ -703,8 +703,8 @@ func getVersion(c *gin.Context) {
 }
 
 func triggerOpenListScan(c *gin.Context) {
-	// 重新加载配置
-	if err := openlist.GlobalScanner.ReloadConfig(); err != nil {
+	// 重新加载配置（手动扫描忽略全局开关）
+	if err := openlist.GlobalScanner.ReloadConfig(true); err != nil {
 		c.PureJSON(http.StatusInternalServerError, gin.H{"error": "加载 OpenList 配置失败"})
 		return
 	}

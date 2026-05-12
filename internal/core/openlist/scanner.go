@@ -28,18 +28,32 @@ func NewScanner() *Scanner {
 }
 
 // ReloadConfig 从数据库重新加载配置
-func (s *Scanner) ReloadConfig() error {
+// forceEnabled 为 true 时忽略全局开关（用于手动扫描）
+func (s *Scanner) ReloadConfig(forceEnabled bool) error {
 	var enabled, apiURL, apiToken db.Setting
 
 	db.DB.Where("key = ?", "openlist_enabled").First(&enabled)
 	db.DB.Where("key = ?", "openlist_api_url").First(&apiURL)
 	db.DB.Where("key = ?", "openlist_api_token").First(&apiToken)
 
+	slog.Debug("OpenList 配置加载",
+		"enabled", enabled.Value,
+		"api_url", apiURL.Value,
+		"has_token", apiToken.Value != "",
+		"force_enabled", forceEnabled)
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if enabled.Value != "true" || apiURL.Value == "" || apiToken.Value == "" {
+	if !forceEnabled && enabled.Value != "true" {
 		s.client = nil
+		slog.Debug("OpenList 全局开关未开启，扫描已禁用")
+		return nil
+	}
+
+	if apiURL.Value == "" || apiToken.Value == "" {
+		s.client = nil
+		slog.Debug("OpenList API 配置不完整，扫描已禁用")
 		return nil
 	}
 
@@ -54,6 +68,7 @@ func (s *Scanner) ScanNow(ctx context.Context) error {
 	s.mu.Unlock()
 
 	if client == nil {
+		slog.Debug("OpenList client 未初始化，跳过扫描")
 		return nil
 	}
 
