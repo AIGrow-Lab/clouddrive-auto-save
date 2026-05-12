@@ -146,8 +146,14 @@
         <el-form-item label="分享链接" required>
           <el-input v-model="form.share_url" placeholder="请输入 139 或 Quark 分享链接" @change="handleUrlChange">
             <template #append>
-              <el-button 
-                :icon="ExternalLink" 
+              <el-button
+                :icon="FolderOpen"
+                title="浏览分享内容并选择目录"
+                :disabled="!form.share_url || !form.account_id"
+                @click="openBrowseShareDialog"
+              />
+              <el-button
+                :icon="ExternalLink"
                 title="在新标签页中打开链接"
                 :disabled="!form.share_url"
                 @click="openExternalLink(form.share_url, form.extract_code)"
@@ -314,10 +320,10 @@
       </template>
     </el-dialog>
 
-    <!-- 选择起始文件独立弹窗 -->
+    <!-- 选择起始文件 / 浏览分享内容弹窗 -->
     <el-dialog
       v-model="startFileDialogVisible"
-      title="选择起始转存文件"
+      :title="browseMode === 'selectShareUrl' ? '浏览分享内容' : '选择起始转存文件'"
       width="900px"
       append-to-body
       destroy-on-close
@@ -335,7 +341,10 @@
           </el-breadcrumb>
         </div>
 
-        <el-alert title="逻辑说明" type="info" :closable="false" show-icon style="margin-bottom: 15px">
+        <el-alert v-if="browseMode === 'selectShareUrl'" title="选择目录" type="info" :closable="false" show-icon style="margin-bottom: 15px">
+          点击文件夹进入子目录，选择目标文件夹后点击"选择为分享链接"，将更新分享链接为该目录的地址。
+        </el-alert>
+        <el-alert v-else title="逻辑说明" type="info" :closable="false" show-icon style="margin-bottom: 15px">
           系统将从选中的文件开始，按更新时间向前转存所有更新的文件（含所选文件本身）。<b>此处已应用您的重命名规则并执行同名预检。</b> 点击文件夹可进入子目录。
         </el-alert>
 
@@ -408,8 +417,15 @@
       </div>
       <template #footer>
         <el-button @click="startFileDialogVisible = false">取消</el-button>
-        <el-button @click="clearStartFile">清除选择</el-button>
-        <el-button type="primary" @click="confirmStartFileSelection">确认选择</el-button>
+        <template v-if="browseMode === 'selectShareUrl'">
+          <el-button type="primary" @click="confirmSelectShareUrl" :disabled="!tempStartFileId">
+            选择为分享链接
+          </el-button>
+        </template>
+        <template v-else>
+          <el-button @click="clearStartFile">清除选择</el-button>
+          <el-button type="primary" @click="confirmStartFileSelection">确认选择</el-button>
+        </template>
       </template>
     </el-dialog>
 
@@ -442,7 +458,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { Plus, Play, Edit, Trash2, RefreshCw, Folder, File, Info, Cloud, ExternalLink, AlertTriangle, Clock } from 'lucide-vue-next'
+import { Plus, Play, Edit, Trash2, RefreshCw, Folder, File, Info, Cloud, ExternalLink, AlertTriangle, Clock, FolderOpen } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTasks, createTask, updateTask, deleteTask, runTask, runAllTasks, previewTask, parseShareLink, getScheduleSettings } from '../api/task'
 import { getAccounts, getFolders, createFolder } from '../api/account'
@@ -512,6 +528,7 @@ const tempStartFileId = ref('')
 // 子目录浏览相关
 const breadcrumbs = ref([]) // [{ id, name }]
 const currentParentId = ref('')
+const browseMode = ref('startFile') // 'startFile' | 'selectShareUrl'
 
 // 处理表格行样式
 const tableRowClassName = ({ row }) => {
@@ -619,9 +636,27 @@ const openStartFileDialog = async () => {
     return ElMessage.warning('请先填写执行账号和分享链接')
   }
 
+  browseMode.value = 'startFile'
   startFileDialogVisible.value = true
   parsingShare.value = true
   tempStartFileId.value = form.value.start_file_id
+  shareFiles.value = []
+  breadcrumbs.value = []
+  currentParentId.value = ''
+
+  await loadShareFiles('')
+}
+
+// 打开浏览分享内容对话框（用于选择目录作为新的分享链接）
+const openBrowseShareDialog = async () => {
+  if (!form.value.share_url || !form.value.account_id) {
+    return ElMessage.warning('请先填写执行账号和分享链接')
+  }
+
+  browseMode.value = 'selectShareUrl'
+  startFileDialogVisible.value = true
+  parsingShare.value = true
+  tempStartFileId.value = ''
   shareFiles.value = []
   breadcrumbs.value = []
   currentParentId.value = ''
@@ -706,6 +741,48 @@ const confirmStartFileSelection = () => {
       selectedStartFileName.value = selected.name
     }
   }
+  startFileDialogVisible.value = false
+}
+
+// 确认选择目录作为新的分享链接
+const confirmSelectShareUrl = () => {
+  if (!tempStartFileId.value) {
+    return ElMessage.warning('请先选择一个文件夹')
+  }
+
+  const selected = shareFiles.value.find(f => f.id === tempStartFileId.value)
+  if (!selected || !selected.is_folder) {
+    return ElMessage.warning('请选择一个文件夹')
+  }
+
+  // 根据平台生成新的分享链接
+  const account = accounts.value.find(acc => acc.id === form.value.account_id)
+  if (!account) return
+
+  const originalUrl = form.value.share_url
+  let newUrl = originalUrl
+
+  if (account.platform === 'quark') {
+    // 夸克网盘：替换 URL 中的 pdirFID
+    // 格式：https://pan.quark.cn/s/{pwdID}#/list/share/{pdirFID}
+    const match = originalUrl.match(/\/s\/(\w+)/)
+    if (match) {
+      const pwdID = match[1]
+      newUrl = `https://pan.quark.cn/s/${pwdID}#/list/share/${selected.id}`
+    }
+  } else if (account.platform === '139') {
+    // 移动云盘：URL 不变，但更新 start_file_id 为选中的文件夹
+    // 139 通过 pCaID 区分目录，URL 格式不变
+    newUrl = originalUrl
+  }
+
+  form.value.share_url = newUrl
+  // 清空起始文件选择
+  form.value.start_file_id = ''
+  form.value.start_file_name = ''
+  selectedStartFileName.value = ''
+
+  ElMessage.success(`已选择目录：${selected.name}`)
   startFileDialogVisible.value = false
 }
 
