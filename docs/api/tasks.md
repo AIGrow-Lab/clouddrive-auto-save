@@ -23,6 +23,7 @@
 | `save_path` | string | 是 | 云盘内保存路径 (如 `/Movies`) |
 | `start_file_id`| string | 否 | 起始文件 ID，系统将从此文件开始(含)向前转存 |
 | `start_file_name`| string | 否 | 起始文件名称，用于前端 UI 快速回显，减少接口解析等待 |
+| `share_parent_id`| string | 否 | **[新]** 139 分享链接的目录 ID，用于指定浏览子目录时的起始位置 |
 | `schedule_mode`| string | 否 | **[新]** 调度模式: `global` (跟随全局), `custom` (自定义), `off` (手动)。默认为 `global` |
 | `cron` | string | 否 | **[新]** 当 `schedule_mode` 为 `custom` 时必填。Cron 表达式 (秒 分 时 日 月 周) |
 | `percent` | int | 否 | **[内部]** 实时进度百分比 |
@@ -123,6 +124,7 @@
 | `account_id` | uint | 关联的账号 ID |
 | `share_url` | string | 待解析的分享链接 |
 | `extract_code`| string | 提取码 |
+| `parent_id` | string | **[新]** 父目录 ID，用于浏览子目录内容 |
 | `save_path` | string | 预期的保存路径（用于执行同名检查） |
 | `pattern` | string | 正则表达式（用于重命名预览） |
 | `replacement` | string | 替换规则 |

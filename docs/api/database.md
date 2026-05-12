@@ -40,6 +40,7 @@
 | `save_path` | string | 保存路径 |
 | `pattern` | string | 重命名正则表达式 |
 | `replacement` | string | 替换模板/魔法变量 |
+| `share_parent_id` | string | **[新]** 139 分享链接的目录 ID，用于指定浏览子目录时的起始位置 |
 | `schedule_mode`| string | `global` (跟随全局), `custom` (自定义), `off` (手动) |
 | `cron` | string | 当模式为 custom 时的标准 6 位 Cron 表达式 |
 | `status` | string | `pending`, `running`, `success`, `failed` |

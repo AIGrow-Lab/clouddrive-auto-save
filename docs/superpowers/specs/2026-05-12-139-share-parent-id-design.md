@@ -15,11 +15,25 @@
 ```go
 type Task struct {
     // ... existing fields ...
-    ShareParentID string `json:"share_parent_id"` // 139 分享链接的目录 ID
+    ShareParentID string `gorm:"size:255" json:"share_parent_id"` // 139 分享链接的目录 ID (可选)
 }
 ```
 
-### 2. 前端：表单新增字段
+### 2. 后端：API 层支持
+
+**文件**: `internal/api/router.go`
+
+在 `updateTask` 函数的 `updateData` 中添加 `share_parent_id` 字段：
+
+```go
+updateData := map[string]interface{}{
+    // ... existing fields ...
+    "share_parent_id": task.ShareParentID,
+    // ...
+}
+```
+
+### 3. 前端：表单新增字段
 
 **文件**: `web/src/views/Tasks.vue`
 
@@ -32,30 +46,20 @@ form.value = {
 }
 ```
 
-### 3. 前端：选择子文件夹时存储
+### 4. 前端：选择子文件夹时存储
 
 在 `confirmSelectShareUrl` 函数中，对于 139 平台，存储 `share_parent_id`：
 
 ```javascript
-if (account.platform === '139') {
-    // 139 通过 pCaID 区分目录，URL 格式不变
-    // 存储当前目录 ID 为 share_parent_id
-    form.value.share_parent_id = currentDirId || ''
-}
-```
-
-### 4. 前端：调用 parseShareLink 时传递
-
-在 `loadShareFiles` 函数中，传递 `share_parent_id` 作为 `parent_id`：
-
-```javascript
-const data = await parseShareLink({
-    account_id: form.value.account_id,
-    share_url: form.value.share_url,
-    extract_code: form.value.extract_code,
-    parent_id: parentId || form.value.share_parent_id, // 优先使用传入的 parentId，否则使用 share_parent_id
+if (account.platform === 'quark') {
+    // 夸克网盘：替换 URL 中的 pdirFID
     // ...
-})
+    form.value.share_parent_id = ''
+} else if (account.platform === '139') {
+    // 移动云盘：URL 不变，但存储 share_parent_id
+    form.value.share_parent_id = currentDirId || ''
+    newUrl = originalUrl
+}
 ```
 
 ### 5. 前端：打开选择起始文件弹窗时使用
@@ -65,14 +69,68 @@ const data = await parseShareLink({
 ```javascript
 const openStartFileDialog = async () => {
     // ...
-    currentParentId.value = form.value.share_parent_id || ''
-    await loadShareFiles(form.value.share_parent_id || '')
+    // 使用 share_parent_id 作为初始目录（139 平台）
+    // 如果有 share_parent_id，将其作为新的根目录
+    const initialParentId = form.value.share_parent_id || ''
+    currentParentId.value = initialParentId
+    await loadShareFiles(initialParentId)
+}
+```
+
+### 6. 前端：浏览分享内容时使用
+
+在 `openBrowseShareDialog` 函数中，根据当前分享链接确定初始目录：
+
+```javascript
+const openBrowseShareDialog = async () => {
+    // ...
+    // 根据当前分享链接确定初始目录
+    const account = accounts.value.find(acc => acc.id === form.value.account_id)
+    let initialParentId = ''
+
+    if (account?.platform === 'quark') {
+        // 夸克平台：从 URL 中解析 pdirFID
+        const match = form.value.share_url.match(/\/s\/(\w+)#\/list\/share\/(\w+)/)
+        if (match && match[2] && match[2] !== '0') {
+            initialParentId = match[2]
+        }
+    } else if (account?.platform === '139') {
+        // 139 平台：使用 share_parent_id
+        initialParentId = form.value.share_parent_id || ''
+    }
+
+    currentParentId.value = initialParentId
+    await loadShareFiles(initialParentId)
+}
+```
+
+### 7. 前端：获取初始目录 ID
+
+添加 `getInitialDirId` 辅助函数，统一获取初始目录 ID：
+
+```javascript
+const getInitialDirId = () => {
+    const account = accounts.value.find(acc => acc.id === form.value.account_id)
+
+    if (account?.platform === 'quark') {
+        // 夸克平台：从 URL 中解析 pdirFID
+        const match = form.value.share_url.match(/\/s\/(\w+)#\/list\/share\/(\w+)/)
+        if (match && match[2] && match[2] !== '0') {
+            return match[2]
+        }
+    } else if (account?.platform === '139') {
+        // 139 平台：使用 share_parent_id
+        return form.value.share_parent_id || ''
+    }
+
+    return ''
 }
 ```
 
 ## 关键文件
 
 - `internal/db/db.go` - Task 模型新增字段
+- `internal/api/router.go` - API 层支持 share_parent_id
 - `web/src/views/Tasks.vue` - 前端表单和逻辑
 
 ## 验证
@@ -80,4 +138,5 @@ const openStartFileDialog = async () => {
 1. 创建 139 任务，选择子文件夹作为分享链接
 2. 保存任务后，再次编辑该任务
 3. 点击"选择起始转存文件"，确认显示的是子目录内容而非根目录
-4. 对于夸克网盘，确认行为不受影响
+4. 点击"浏览分享内容并选择目录"，确认显示的是当前分享链接对应的目录
+5. 对于夸克网盘，确认从 URL 中正确解析 pdirFID
