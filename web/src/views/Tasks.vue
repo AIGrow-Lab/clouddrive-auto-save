@@ -361,6 +361,13 @@
           @current-change="handleStartFileTableChange"
           @row-dblclick="handleRowDblClick"
         >
+          <!-- startFile 模式显示 radio 列 -->
+          <el-table-column v-if="browseMode === 'startFile'" width="40" align="center">
+            <template #default="{ row }">
+              <el-radio v-if="!row.is_folder" v-model="tempStartFileId" :label="row.id" class="naked-radio"><span></span></el-radio>
+            </template>
+          </el-table-column>
+
           <el-table-column label="原始文件名" show-overflow-tooltip min-width="180">
             <template #default="{ row }">
               <div class="name-main" :class="{ 'folder-clickable': row.is_folder }" @click="row.is_folder && enterFolder(row)" @dblclick="!row.is_folder && handleRowDblClick(row)">
@@ -400,6 +407,15 @@
           </el-table-column>
 
           <el-table-column prop="updated_at" label="分享更新时间" width="160" sortable />
+
+          <!-- selectShareUrl 模式显示进入按钮 -->
+          <el-table-column v-if="browseMode === 'selectShareUrl'" label="操作" width="80" align="center">
+            <template #default="{ row }">
+              <el-button v-if="row.is_folder" type="primary" link size="small" @click="enterFolder(row)">
+                进入
+              </el-button>
+            </template>
+          </el-table-column>
         </el-table>
       </div>
       <template #footer>
