@@ -676,9 +676,28 @@ const openBrowseShareDialog = async () => {
   tempStartFileId.value = ''
   shareFiles.value = []
   breadcrumbs.value = []
-  currentParentId.value = ''
 
-  await loadShareFiles('')
+  // 根据当前分享链接确定初始目录
+  const account = accounts.value.find(acc => acc.id === form.value.account_id)
+  let initialParentId = ''
+
+  if (account?.platform === 'quark') {
+    // 夸克平台：从 URL 中解析 pdirFID
+    const match = form.value.share_url.match(/\/s\/(\w+)#\/list\/share\/(\w+)/)
+    if (match && match[2] && match[2] !== '0') {
+      initialParentId = match[2]
+      breadcrumbs.value = [{ id: initialParentId, name: '当前目录' }]
+    }
+  } else if (account?.platform === '139') {
+    // 139 平台：使用 share_parent_id
+    if (form.value.share_parent_id) {
+      initialParentId = form.value.share_parent_id
+      breadcrumbs.value = [{ id: initialParentId, name: '当前目录' }]
+    }
+  }
+
+  currentParentId.value = initialParentId
+  await loadShareFiles(initialParentId)
 }
 
 // 加载分享文件列表（支持子目录浏览）
@@ -722,22 +741,19 @@ const enterFolder = async (folder) => {
   await loadShareFiles(folder.id)
 }
 
-// 获取初始目录 ID（根据平台，仅在 startFile 模式下使用）
+// 获取初始目录 ID（根据平台）
 const getInitialDirId = () => {
-  // selectShareUrl 模式下总是从根目录开始
-  if (browseMode.value === 'selectShareUrl') {
-    return ''
-  }
-
   const account = accounts.value.find(acc => acc.id === form.value.account_id)
 
-  if (account?.platform === '139') {
-    // 139 平台：使用 share_parent_id
-    return form.value.share_parent_id || ''
-  } else if (account?.platform === 'quark') {
+  if (account?.platform === 'quark') {
     // 夸克平台：从 URL 中解析 pdirFID
     const match = form.value.share_url.match(/\/s\/(\w+)#\/list\/share\/(\w+)/)
-    return match ? (match[2] || '') : ''
+    if (match && match[2] && match[2] !== '0') {
+      return match[2]
+    }
+  } else if (account?.platform === '139') {
+    // 139 平台：使用 share_parent_id
+    return form.value.share_parent_id || ''
   }
 
   return ''
