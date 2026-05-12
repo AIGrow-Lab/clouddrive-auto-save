@@ -99,6 +99,8 @@ func (s *Scanner) OnTaskComplete(hasNewContent bool) {
 		return
 	}
 
+	slog.Debug("OpenList 任务完成", "has_new_content", hasNewContent, "pending_batch", s.pendingBatch)
+
 	if s.pendingBatch > 0 {
 		s.pendingBatch--
 		if s.pendingBatch > 0 {
@@ -106,6 +108,7 @@ func (s *Scanner) OnTaskComplete(hasNewContent bool) {
 			return
 		}
 		// 批量任务全部完成，触发扫描
+		slog.Info("OpenList 批量任务全部完成，准备触发扫描")
 		s.scheduleScan()
 		return
 	}
@@ -118,6 +121,7 @@ func (s *Scanner) OnTaskComplete(hasNewContent bool) {
 
 // scheduleScan 延迟 3 秒触发扫描（合并连续完成）
 func (s *Scanner) scheduleScan() {
+	slog.Debug("OpenList 调度扫描（3 秒后执行）")
 	if s.scanTimer != nil {
 		s.scanTimer.Stop()
 	}
