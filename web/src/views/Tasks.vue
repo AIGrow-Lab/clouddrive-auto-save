@@ -1563,5 +1563,8 @@ html.dark .task-name-cell .name {
 
 :deep(.el-input-group__append .el-button) {
   margin-left: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>
