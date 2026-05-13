@@ -1,15 +1,7 @@
-name: Build and Publish (Main)
+name: Build and Publish (Dev)
 
 on:
   workflow_dispatch: {}
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - '**.md'
-      - 'e2e/**'
-      - 'LICENSE'
-      - '.gitignore'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -22,13 +14,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Generate dev version
+        id: version
+        run: echo "sha=dev-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: zcq98/clouddrive-auto-save
           tags: |
-            type=raw,value=latest
+            type=raw,value=dev
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -51,6 +47,6 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            VERSION=latest
+            VERSION=${{ steps.version.outputs.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
