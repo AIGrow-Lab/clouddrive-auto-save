@@ -55,6 +55,13 @@ make clean          # 清理 bin/、web/dist/、coverage.out
 
 - `E2E_TEST_MODE=true` 激活 `internal/core/mock_http.go`，替换 `http.DefaultTransport` 拦截所有云盘 API 调用并返回预设响应
 - Playwright 测试用例位于 `e2e/tests/`，覆盖账号、仪表盘、任务和设置模块
+- Playwright 选择器：当多个按钮的可访问名称有包含关系时（如"选择目录" vs "浏览分享内容并选择目录"），必须使用 `getByRole('button', { name: '...', exact: true })` 避免严格模式冲突
+
+### 前端注意事项
+
+- Element Plus `el-input` 的 `#append` 插槽中放置多个按钮时，需要显式 CSS：`:deep(.el-input-group__append) { display: flex; align-items: center; }`，按钮需设置 `margin-left: 0`
+- lucide-vue-next 图标居中：按钮需设置 `display: inline-flex; align-items: center; justify-content: center`
+- 139 平台分享链接 URL 不包含目录信息（不像夸克可通过 URL 中的 pdirFID 区分），子目录需通过 `share_parent_id` 字段单独存储
 
 ## 核心约定
 
